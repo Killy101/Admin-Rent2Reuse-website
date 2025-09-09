@@ -1,0 +1,30 @@
+export const rolePermissions: Record<string, string[]> = {
+  admin: [
+    "dashboard",
+    "manageUsers",
+    "itemList",
+    "teamMembers",
+    "subscription",
+    "transaction",
+    "profile",
+    "support",
+    "announcement",
+  ],
+  "manage-users": [
+    "dashboard",
+    "manageUsers",
+    "itemList",
+    "teamMembers",
+    "subscription",
+    "transaction",
+    "profile",
+  ],
+  support: [
+    "dashboard",
+    "itemList",
+    "teamMembers",
+    "profile",
+    "support",
+    "announcement",
+  ],
+};
