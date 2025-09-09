@@ -23,6 +23,7 @@ import {
   Target,
 } from "lucide-react";
 import { db } from "@/app/firebase/config";
+import ItemsMap from "../../components/ItemsMap";
 import {
   collection,
   getDocs,
@@ -1843,6 +1844,10 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </motion.div>
+
+        <div style={{ height: "600px" }}>
+          <ItemsMap />
+        </div>
       </div>
     </div>
   );
