@@ -1,67 +1,224 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "@/app/firebase/config";
 
-type LoginLog = {
-  timestamp: Date;
-  [key: string]: any;
-};
-
-type AdminLog = {
+type UserLogEntry = {
   id: string;
   email?: string;
+  uid?: string;
   adminRole?: string;
-  lastLogin?: Date;
-  lastLogout?: Date;
-  loginLogs?: LoginLog[];
+  loginLogs: {
+    lastLogin?: Date | null;
+    lastLogout?: Date | null;
+  }[];
+  timestamp?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
   [key: string]: any;
 };
 
 const UserLogsPage = () => {
-  const [logs, setLogs] = useState<AdminLog[]>([]);
+  const [logs, setLogs] = useState<UserLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortField, setSortField] = useState("lastLogout");
+  const [sortField, setSortField] = useState("timestamp");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const itemsPerPage = 10;
 
-  // Fetch admin logs from Firebase
+  // Function to fetch admin role from admin collection
+  const fetchAdminRole = async (
+    uid: string,
+    email: string
+  ): Promise<string> => {
+    try {
+      // Try to fetch by UID first
+      if (uid) {
+        const adminDocRef = doc(db, "admin", uid);
+        const adminDoc = await getDoc(adminDocRef);
+        if (adminDoc.exists()) {
+          return adminDoc.data()?.role || adminDoc.data()?.adminRole || "user";
+        }
+      }
+
+      // If UID doesn't work, try to find by email in admin collection
+      if (email) {
+        const adminCollection = collection(db, "admin");
+        const adminSnapshot = await getDocs(adminCollection);
+
+        for (const adminDoc of adminSnapshot.docs) {
+          const adminData = adminDoc.data();
+          if (adminData.email === email) {
+            return adminData.role || adminData.adminRole || "user";
+          }
+        }
+      }
+
+      return "user"; // Default role
+    } catch (error) {
+      console.error("Error fetching admin role:", error);
+      return "user";
+    }
+  };
+
+  // Fetch user logs from Firebase
   useEffect(() => {
     const fetchLogs = async () => {
       try {
         setLoading(true);
-        const adminCollection = collection(db, "admin");
+        const userLogsCollection = collection(db, "userLogs");
 
-        let q = query(adminCollection);
+        let q = query(userLogsCollection);
 
-        // Add ordering
-        if (sortField === "lastLogout" || sortField === "lastLogin") {
-          q = query(adminCollection, orderBy(sortField, sortDirection));
+        // Add ordering by timestamp (most recent first)
+        if (
+          sortField === "timestamp" ||
+          sortField === "createdAt" ||
+          sortField === "updatedAt"
+        ) {
+          q = query(userLogsCollection, orderBy("createdAt", sortDirection));
         }
 
         const querySnapshot = await getDocs(q);
-        const logsData = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
+        const logsData: UserLogEntry[] = [];
 
-          return {
-            id: doc.id,
-            ...data,
-            // Convert Firestore timestamps to readable dates
-            lastLogin:
-              data.lastLogin?.toDate?.() ||
-              (data.lastLogin ? new Date(data.lastLogin) : null),
-            lastLogout:
-              data.lastLogout?.toDate?.() ||
-              (data.lastLogout ? new Date(data.lastLogout) : null),
+        // Process each document
+        for (const docSnapshot of querySnapshot.docs) {
+          const data = docSnapshot.data();
+
+          // Convert Firestore timestamps to readable dates
+          const processDate = (dateField: any) => {
+            if (!dateField) return null;
+            if (dateField?.toDate) return dateField.toDate();
+            if (typeof dateField === "string") {
+              // Handle ISO string format like "2025-09-09T17:12:46.242Z"
+              const date = new Date(dateField);
+              return isNaN(date.getTime()) ? null : date;
+            }
+            if (typeof dateField === "number") return new Date(dateField);
+            return null;
           };
-        });
+
+          // Process loginLogs array - FIXED: Handle the actual data structure
+          let mostRecentLogin: Date | null = null;
+          let mostRecentLogout: Date | null = null;
+
+          if (data.loginLogs && Array.isArray(data.loginLogs)) {
+            // Find the most recent login and logout from all entries
+            data.loginLogs.forEach((logEntry: any) => {
+              const loginDate = processDate(logEntry.lastLogin);
+              const logoutDate = processDate(logEntry.lastLogout);
+
+              if (
+                loginDate &&
+                (!mostRecentLogin || loginDate > mostRecentLogin)
+              ) {
+                mostRecentLogin = loginDate;
+              }
+
+              // Only consider logout if it's not null (null means still logged in)
+              if (
+                logoutDate &&
+                (!mostRecentLogout || logoutDate > mostRecentLogout)
+              ) {
+                mostRecentLogout = logoutDate;
+              }
+            });
+
+            // Check if the most recent entry has a null logout (still logged in)
+            const mostRecentEntry = data.loginLogs[data.loginLogs.length - 1];
+            if (mostRecentEntry && mostRecentEntry.lastLogout === null) {
+              // Find the corresponding login date for this null logout
+              const correspondingLogin = processDate(mostRecentEntry.lastLogin);
+              if (correspondingLogin) {
+                mostRecentLogin = correspondingLogin;
+                mostRecentLogout = null; // Explicitly set to null to indicate still logged in
+              }
+            }
+          }
+
+          // Fetch admin role from admin collection
+          const adminRole = await fetchAdminRole(
+            data.uid || "",
+            data.email || ""
+          );
+
+          // Create a log entry for this document
+          const logEntry: UserLogEntry = {
+            id: docSnapshot.id,
+            email: data.email || "",
+            uid: data.uid || "",
+            adminRole: adminRole,
+            loginLogs: [
+              {
+                lastLogin: mostRecentLogin,
+                lastLogout: mostRecentLogout,
+              },
+            ],
+            timestamp:
+              processDate(data.updatedAt) || processDate(data.createdAt),
+            createdAt: processDate(data.createdAt),
+            updatedAt: processDate(data.updatedAt),
+            ...data,
+          };
+
+          logsData.push(logEntry);
+        }
+
+        // Sort the data if not sorting by Firestore query
+        if (
+          sortField !== "timestamp" &&
+          sortField !== "createdAt" &&
+          sortField !== "updatedAt"
+        ) {
+          logsData.sort((a, b) => {
+            let aValue: any;
+            let bValue: any;
+
+            if (sortField === "lastLogin") {
+              aValue = a.loginLogs[0]?.lastLogin?.getTime() || 0;
+              bValue = b.loginLogs[0]?.lastLogin?.getTime() || 0;
+            } else if (sortField === "lastLogout") {
+              aValue = a.loginLogs[0]?.lastLogout?.getTime() || 0;
+              bValue = b.loginLogs[0]?.lastLogout?.getTime() || 0;
+            } else {
+              aValue = a[sortField as keyof UserLogEntry];
+              bValue = b[sortField as keyof UserLogEntry];
+            }
+
+            // Handle date sorting
+            if (aValue instanceof Date) aValue = aValue.getTime();
+            if (bValue instanceof Date) bValue = bValue.getTime();
+
+            // Handle string sorting
+            if (typeof aValue === "string") aValue = aValue.toLowerCase();
+            if (typeof bValue === "string") bValue = bValue.toLowerCase();
+
+            // Handle null/undefined values
+            if (aValue == null && bValue == null) return 0;
+            if (aValue == null) return 1;
+            if (bValue == null) return -1;
+
+            if (sortDirection === "asc") {
+              return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+            } else {
+              return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+            }
+          });
+        }
 
         setLogs(logsData);
       } catch (err) {
@@ -69,7 +226,7 @@ const UserLogsPage = () => {
           err && typeof err === "object" && "message" in err
             ? (err as { message: string }).message
             : String(err);
-        setError("Failed to fetch admin logs: " + errorMsg);
+        setError("Failed to fetch user logs: " + errorMsg);
         console.error("Error fetching logs:", err);
       } finally {
         setLoading(false);
@@ -83,7 +240,8 @@ const UserLogsPage = () => {
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
       log.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.adminRole?.toLowerCase().includes(searchTerm.toLowerCase());
+      log.adminRole?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.uid?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === "all" || log.adminRole === roleFilter;
     const matchesStatus =
       statusFilter === "all" ||
@@ -128,25 +286,50 @@ const UserLogsPage = () => {
     });
   };
 
-  // Check if user is online (has logged in but not logged out, or logout is older than login)
-  const isUserOnline = (log: AdminLog) => {
-    // If no lastLogin, user is offline
-    if (!log.lastLogin) return false;
+  // --- define this BEFORE your return() ---
+  const isUserOnline = (log: UserLogEntry) => {
+    const sessions = log.loginLogs;
+    if (!sessions || sessions.length === 0) return false;
 
-    // If no lastLogout, user is online (logged in but never logged out)
-    if (!log.lastLogout) return true;
+    // Find latest session by login date
+    const latest = sessions.reduce((a, b) => {
+      const aLogin = a.lastLogin ? new Date(a.lastLogin).getTime() : 0;
+      const bLogin = b.lastLogin ? new Date(b.lastLogin).getTime() : 0;
+      return bLogin > aLogin ? b : a;
+    });
 
-    // Compare last login and last logout times
-    const lastLoginTime = new Date(log.lastLogin).getTime();
-    const lastLogoutTime = new Date(log.lastLogout).getTime();
+    if (!latest.lastLogin) return false;
+    if (latest.lastLogout === null) return true;
+    if (!latest.lastLogout) return true;
 
-    // User is online if last login is more recent than last logout
-    return lastLoginTime > lastLogoutTime;
+    return new Date(latest.lastLogin) > new Date(latest.lastLogout);
   };
 
-  // Count online and offline users
-  const onlineUsers = logs.filter((log) => isUserOnline(log)).length;
-  const offlineUsers = logs.length - onlineUsers;
+  // Count online and offline users - count unique users by email/uid
+  const getUniqueUsers = () => {
+    const userMap = new Map();
+
+    logs.forEach((log) => {
+      const identifier = log.email || log.uid;
+      if (!identifier) return;
+
+      const existing = userMap.get(identifier);
+      if (
+        !existing ||
+        (log.timestamp &&
+          existing.timestamp &&
+          log.timestamp > existing.timestamp)
+      ) {
+        userMap.set(identifier, log);
+      }
+    });
+
+    return Array.from(userMap.values());
+  };
+
+  const uniqueUsers = getUniqueUsers();
+  const onlineUsers = uniqueUsers.filter((user) => isUserOnline(user)).length;
+  const offlineUsers = uniqueUsers.length - onlineUsers;
 
   if (loading) {
     return (
@@ -207,10 +390,10 @@ const UserLogsPage = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-slate-800 mb-2">
-            Admin User Logs
+            User Login Logs
           </h1>
           <p className="text-slate-600">
-            Monitor admin login and logout activities
+            Monitor user login and logout activities from userLogs collection
           </p>
         </div>
 
@@ -237,7 +420,7 @@ const UserLogsPage = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="Search by email or role..."
+                  placeholder="Search by email, role, or UID..."
                   className="pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full sm:w-80"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -288,7 +471,7 @@ const UserLogsPage = () => {
                 <div className="text-2xl font-bold text-blue-600">
                   {logs.length}
                 </div>
-                <div className="text-slate-500">Total</div>
+                <div className="text-slate-500">Total Logs</div>
               </div>
             </div>
           </div>
@@ -308,7 +491,7 @@ const UserLogsPage = () => {
                       onClick={() => handleSort("email")}
                       className="flex items-center gap-2 hover:text-blue-600 transition-colors"
                     >
-                      Admin Email
+                      User Email
                       <svg
                         className={`h-4 w-4 transition-transform ${
                           sortField === "email" && sortDirection === "desc"
@@ -413,78 +596,98 @@ const UserLogsPage = () => {
                   const isOnline = isUserOnline(log);
                   const sequentialNumber = startIndex + index + 1;
 
-                  return (
-                    <tr
-                      key={`${log.id}-${index}`}
-                      className="hover:bg-slate-50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center">
-                          <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">
-                            {sequentialNumber}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
-                              {log.email?.charAt(0).toUpperCase() || "A"}
+                  return log.loginLogs.map((session, sessionIndex) => {
+                    const isOnline =
+                      session.lastLogout === null ||
+                      (session.lastLogin &&
+                        session.lastLogout &&
+                        session.lastLogin > session.lastLogout);
+
+                    return (
+                      <tr
+                        key={`${log.id}-${index}-${sessionIndex}`}
+                        className="hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center">
+                            <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">
+                              {sequentialNumber}.{sessionIndex + 1}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
+                                {log.email?.charAt(0).toUpperCase() ||
+                                  log.uid?.charAt(0).toUpperCase() ||
+                                  "U"}
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-semibold text-slate-900">
+                                {log.email || "N/A"}
+                              </div>
+                              <div className="text-sm text-slate-500">
+                                UID: {log.uid || "N/A"}
+                              </div>
                             </div>
                           </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-semibold text-slate-900">
-                              {log.email || "N/A"}
-                            </div>
-                            <div className="text-sm text-slate-500">
-                              ID: {log.id}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
-                            log.adminRole === "super_admin"
-                              ? "bg-purple-100 text-purple-800"
-                              : log.adminRole === "admin"
-                              ? "bg-blue-100 text-blue-800"
-                              : log.adminRole === "moderator"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-slate-100 text-slate-800"
-                          }`}
-                        >
-                          {log.adminRole || "N/A"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-slate-900">
-                          {formatDate(log.lastLogin)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-slate-900">
-                          {formatDate(log.lastLogout)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            isOnline
-                              ? "bg-green-100 text-green-800"
-                              : "bg-slate-100 text-slate-800"
-                          }`}
-                        >
+                        </td>
+                        <td className="px-6 py-4">
                           <span
-                            className={`h-1.5 w-1.5 rounded-full mr-1.5 ${
-                              isOnline ? "bg-green-400" : "bg-slate-400"
+                            className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                              log.adminRole === "superAdmin"
+                                ? "bg-purple-100 text-purple-800"
+                                : log.adminRole === "admin"
+                                ? "bg-blue-100 text-blue-800"
+                                : log.adminRole === "moderator"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-slate-100 text-slate-800"
                             }`}
-                          ></span>
-                          {isOnline ? "Online" : "Offline"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
+                          >
+                            {log.adminRole || "user"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-slate-900">
+                            {session.lastLogin
+                              ? formatDate(session.lastLogin)
+                              : "Never"}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-slate-900">
+                            {session.lastLogout === null ? (
+                              <span className="text-green-600 font-medium">
+                                Still logged in
+                              </span>
+                            ) : session.lastLogout ? (
+                              formatDate(session.lastLogout)
+                            ) : (
+                              <span className="text-slate-500">No logout</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              isOnline
+                                ? "bg-green-100 text-green-800"
+                                : "bg-slate-100 text-slate-800"
+                            }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full mr-1.5 ${
+                                isOnline ? "bg-green-400" : "bg-slate-400"
+                              }`}
+                            ></span>
+                            {isOnline ? "Online" : "Offline"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  });
                 })}
               </tbody>
             </table>
@@ -510,7 +713,7 @@ const UserLogsPage = () => {
                 No logs found
               </h3>
               <p className="mt-1 text-sm text-slate-500">
-                No admin logs match your current filters.
+                No user logs match your current filters.
               </p>
             </div>
           )}

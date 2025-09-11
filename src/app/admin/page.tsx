@@ -1845,9 +1845,9 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
 
-        <div style={{ height: "600px" }}>
+        {/* <div style={{ height: "600px" }}>
           <ItemsMap />
-        </div>
+        </div> */}
       </div>
     </div>
   );

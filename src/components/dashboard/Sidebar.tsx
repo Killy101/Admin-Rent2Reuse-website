@@ -9,12 +9,8 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "@/app/firebase/config";
 import { Button } from "@/components/ui/button";
 import { FaRegUserCircle } from "react-icons/fa";
-import { BiSolidDashboard } from "react-icons/bi";
-import { AiOutlineTransaction } from "react-icons/ai";
-import { PiUserList } from "react-icons/pi";
 import { TiThListOutline } from "react-icons/ti";
 import { RiTeamLine } from "react-icons/ri";
-import { IoSettingsOutline } from "react-icons/io5";
 import {
   MdOutlinePeople,
   MdOutlinePayment,
@@ -36,12 +32,6 @@ import {
   onSnapshot, // ✅ real Firebase helper
 } from "firebase/firestore";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import {
@@ -382,10 +372,56 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
   }, []);
 
   // Handle logout function
+  // Replace the handleLogout function in your sidebar component with this updated version:
+
   const handleLogout = useCallback(async () => {
     setLogoutLoading(true);
     try {
       if (user) {
+        console.log("Starting logout process for user:", user.uid);
+
+        // Update logout time in userLogs collection
+        const userLogsQuery = query(
+          collection(db, "userLogs"),
+          where("uid", "==", user.uid)
+        );
+        const userLogsSnapshot = await getDocs(userLogsQuery);
+
+        if (!userLogsSnapshot.empty) {
+          const userLogDoc = userLogsSnapshot.docs[0];
+          const userLogData = userLogDoc.data();
+          const loginLogs = userLogData.loginLogs || [];
+
+          if (loginLogs.length > 0) {
+            // Find the most recent login entry with null logout
+            const updatedLogs = [...loginLogs];
+            const lastActiveIndex = updatedLogs.findIndex(
+              (log) => log.lastLogout === null
+            );
+
+            if (lastActiveIndex !== -1) {
+              // Update the logout time for the active session
+              updatedLogs[lastActiveIndex] = {
+                ...updatedLogs[lastActiveIndex],
+                lastLogout: new Date().toISOString(),
+              };
+
+              // Update the userLogs document
+              await updateDoc(userLogDoc.ref, {
+                loginLogs: updatedLogs,
+                updatedAt: new Date(),
+              });
+
+              console.log("Successfully updated logout time in userLogs");
+            } else {
+              console.warn("No active session found to logout");
+            }
+          }
+        } else {
+          console.warn("No userLogs document found for user:", user.uid);
+        }
+
+        // Also update admin collection with lastLogout (for backward compatibility)
         const adminQuery = query(
           collection(db, "admin"),
           where("uid", "==", user.uid)
@@ -397,31 +433,127 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
           await updateDoc(adminDoc.ref, {
             lastLogout: new Date(),
           });
-          console.log("Updated lastLogout for:", adminDoc.id);
+          console.log("Updated lastLogout in admin collection");
         }
       }
 
-      await signOut(auth);
+      // Clear localStorage
       localStorage.removeItem("adminRole");
+      localStorage.removeItem("adminUid");
+      localStorage.removeItem("isAuthenticated");
+
+      // Sign out from Firebase Auth
+      await signOut(auth);
+
+      console.log("Sidebar logout completed successfully");
     } catch (error) {
       console.error("Error signing out:", error);
+      // Still attempt to sign out even if Firestore update fails
+      try {
+        await signOut(auth);
+        localStorage.clear();
+      } catch (signOutError) {
+        console.error("Critical error during logout:", signOutError);
+      }
     } finally {
       setLogoutLoading(false);
     }
   }, [user]);
-
   // ---------------- HANDLE TAB CLOSE/REFRESH ----------------
+  // Replace the existing beforeunload useEffect in your sidebar with this updated version:
+
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const handleBeforeUnload = async () => {
       if (user?.uid) {
-        const data = JSON.stringify({ uid: user.uid });
-        const blob = new Blob([data], { type: "application/json" });
+        try {
+          // Update logout time in userLogs collection when tab/window closes
+          const userLogsQuery = query(
+            collection(db, "userLogs"),
+            where("uid", "==", user.uid)
+          );
+          const userLogsSnapshot = await getDocs(userLogsQuery);
+
+          if (!userLogsSnapshot.empty) {
+            const userLogDoc = userLogsSnapshot.docs[0];
+            const userLogData = userLogDoc.data();
+            const loginLogs = userLogData.loginLogs || [];
+
+            if (loginLogs.length > 0) {
+              // Find the most recent login entry with null logout
+              const updatedLogs = [...loginLogs];
+              const lastActiveIndex = updatedLogs.findIndex(
+                (log) => log.lastLogout === null
+              );
+
+              if (lastActiveIndex !== -1) {
+                // Update the logout time for the active session
+                updatedLogs[lastActiveIndex] = {
+                  ...updatedLogs[lastActiveIndex],
+                  lastLogout: new Date().toISOString(),
+                };
+
+                // Update the userLogs document
+                await updateDoc(userLogDoc.ref, {
+                  loginLogs: updatedLogs,
+                  updatedAt: new Date(),
+                });
+
+                // Also update admin collection
+                const adminQuery = query(
+                  collection(db, "admin"),
+                  where("uid", "==", user.uid)
+                );
+                const adminSnapshot = await getDocs(adminQuery);
+
+                if (!adminSnapshot.empty) {
+                  const adminDoc = adminSnapshot.docs[0];
+                  await updateDoc(adminDoc.ref, {
+                    lastLogout: new Date(),
+                  });
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error updating logout on beforeunload:", error);
+        }
+      }
+    };
+
+    // For modern browsers - use beforeunload with async handling
+    const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
+      if (user?.uid) {
+        // Use sendBeacon for reliable data transmission during page unload
+        const logoutData = {
+          uid: user.uid,
+          timestamp: new Date().toISOString(),
+          action: "logout_beforeunload",
+        };
+
+        // Send beacon to your API endpoint that handles the logout logic
+        const blob = new Blob([JSON.stringify(logoutData)], {
+          type: "application/json",
+        });
+
+        // You'll need to create this API endpoint
         navigator.sendBeacon("/api/logout-beacon", blob);
       }
     };
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    // For older browsers or fallback
+    const unloadHandler = () => {
+      if (user?.uid) {
+        handleBeforeUnload();
+      }
+    };
+
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+    window.addEventListener("unload", unloadHandler);
+
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnloadHandler);
+      window.removeEventListener("unload", unloadHandler);
+    };
   }, [user]);
   // Check if route is active
   const isActive = useCallback(

@@ -11,6 +11,9 @@ import {
   getDocs,
   updateDoc,
   arrayUnion,
+  addDoc,
+  doc,
+  setDoc,
 } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -37,8 +40,11 @@ interface AdminData {
   username?: string;
   accountStatus?: string;
   adminRole?: string;
-  loginLogs?: Date[];
-  lastLogout?: Date[];
+}
+
+interface UserLog {
+  lastLogin: string;
+  lastLogout: string | null;
 }
 
 export default function SignInPage({ className }: React.ComponentProps<"div">) {
@@ -88,6 +94,62 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
     }
   }, 500);
 
+  // Function to create or update user logs
+  const createOrUpdateUserLog = async (uid: string, email: string) => {
+    try {
+      const now = new Date();
+      const newLogEntry: UserLog = {
+        lastLogin: now.toISOString(),
+        lastLogout: null,
+      };
+
+      // Check if userLogs document exists for this user
+      const userLogsQuery = query(
+        collection(db, "userLogs"),
+        where("uid", "==", uid)
+      );
+      const userLogsSnapshot = await getDocs(userLogsQuery);
+
+      if (userLogsSnapshot.empty) {
+        // Create new userLogs document
+        await addDoc(collection(db, "userLogs"), {
+          uid: uid,
+          email: email,
+          adminRole: "",
+          loginLogs: [newLogEntry],
+          createdAt: now,
+          updatedAt: now,
+        });
+        console.log("Created new userLogs document");
+      } else {
+        // Update existing userLogs document
+        const userLogDoc = userLogsSnapshot.docs[0];
+        await updateDoc(userLogDoc.ref, {
+          loginLogs: arrayUnion(newLogEntry),
+          updatedAt: now,
+        });
+        console.log("Updated existing userLogs document");
+      }
+
+      // Also update the admin collection with just the lastLogin timestamp
+      const adminQuery = query(
+        collection(db, "admin"),
+        where("uid", "==", uid)
+      );
+      const adminSnapshot = await getDocs(adminQuery);
+
+      if (!adminSnapshot.empty) {
+        const adminDoc = adminSnapshot.docs[0];
+        await updateDoc(adminDoc.ref, {
+          lastLogin: now,
+        });
+      }
+    } catch (error) {
+      console.error("Error creating/updating user log:", error);
+      throw error;
+    }
+  };
+
   // Single auth state listener with proper admin validation
   useEffect(() => {
     let mounted = true;
@@ -119,6 +181,9 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
           }
           return;
         }
+
+        // Create or update user log entry
+        await createOrUpdateUserLog(user.uid, user.email!);
 
         // Store admin data
         localStorage.setItem("adminRole", adminData.adminRole || "");
@@ -176,17 +241,6 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
         throw new Error(`Account is ${adminData.accountStatus}`);
       }
 
-      const now = new Date();
-
-      // Add a new login record with lastLogout set to null
-      await updateDoc(adminDoc.ref, {
-        lastLogin: now,
-        loginLogs: arrayUnion({
-          lastLogin: now.toISOString(),
-          lastLogout: null,
-        }),
-      });
-
       return {
         email: adminData.email,
         uid: uid,
@@ -194,12 +248,7 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
         username: adminData.username,
         accountStatus: adminData.accountStatus,
         adminRole: adminData.adminRole,
-        lastLogin: now.toISOString(),
-        loginLogs: [
-          ...(adminData.loginLogs || []),
-          { lastLogin: now, lastLogout: null },
-        ],
-        lastLogout: adminData.lastLogout || [],
+        lastLogin: new Date().toISOString(),
       };
     } catch (error) {
       console.error("Error validating admin account:", error);
