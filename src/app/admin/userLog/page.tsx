@@ -757,7 +757,7 @@ const UserLogsPage = () => {
                       );
                     })}
                   </div>
-
+                  <p>hahaha</p>
                   <button
                     onClick={() =>
                       setCurrentPage((prev) => Math.min(prev + 1, totalPages))
