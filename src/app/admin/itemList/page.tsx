@@ -201,10 +201,10 @@ const ItemListPage: React.FC = () => {
 
   // Calculate stats
   const availableItems = items.filter(
-    (item) => item.itemStatus === "Available"
+    (item) => item.itemStatus === "available"
   ).length;
   const unavailableItems = items.filter(
-    (item) => item.itemStatus !== "Available"
+    (item) => item.itemStatus !== "available"
   ).length;
 
   if (loading) {
@@ -341,16 +341,14 @@ const ItemListPage: React.FC = () => {
           className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-xl border border-white/20 mb-8"
         >
           <div className="flex flex-col lg:flex-row gap-4 items-center">
-            <div className="flex-1 w-full">
-              <div className="relative">
-                <Input
-                  placeholder="Search items by name or description..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-12 pr-4 py-3 text-lg border-2 border-gray-200 rounded-2xl focus:border-blue-500 focus:ring-0 bg-white/50 backdrop-blur-sm transition-all duration-300"
-                />
-                <Search className="w-5 h-5 absolute left-4 top-4 text-gray-400" />
-              </div>
+            <div className=" flex-1 flex-row">
+              <Input
+                placeholder="Search items by name or description..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-12 pr-4 py-3 text-lg h-12 border-2 border-gray-200 rounded-2xl focus:border-blue-500 focus:ring-0 bg-white/50 backdrop-blur-sm transition-all duration-300"
+              />
+              <Search className="w-5 h-5 flex text-gray-400 absolute left-10 bottom-10" />
             </div>
 
             <div className="flex gap-3">
