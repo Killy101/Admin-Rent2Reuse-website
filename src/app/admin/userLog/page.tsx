@@ -26,6 +26,18 @@ type UserLogEntry = {
   [key: string]: any;
 };
 
+type SessionRow = {
+  rowId: string; // unique for React key
+  parentId: string; // original doc id
+  email: string;
+  uid: string;
+  adminRole: string;
+  lastLogin: Date | null;
+  lastLogout: Date | null;
+  activityTime: number; // numeric timestamp for sorting
+  isOnline: boolean;
+};
+
 const UserLogsPage = () => {
   const [logs, setLogs] = useState<UserLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,8 +46,6 @@ const UserLogsPage = () => {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortField, setSortField] = useState("timestamp");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const itemsPerPage = 10;
 
@@ -45,7 +55,6 @@ const UserLogsPage = () => {
     email: string
   ): Promise<string> => {
     try {
-      // Try to fetch by UID first
       if (uid) {
         const adminDocRef = doc(db, "admin", uid);
         const adminDoc = await getDoc(adminDocRef);
@@ -54,7 +63,6 @@ const UserLogsPage = () => {
         }
       }
 
-      // If UID doesn't work, try to find by email in admin collection
       if (email) {
         const adminCollection = collection(db, "admin");
         const adminSnapshot = await getDocs(adminCollection);
@@ -67,31 +75,22 @@ const UserLogsPage = () => {
         }
       }
 
-      return "user"; // Default role
+      return "user";
     } catch (error) {
       console.error("Error fetching admin role:", error);
       return "user";
     }
   };
 
-  // Fetch user logs from Firebase
+  // Fetch user logs from Firebase (unchanged logic for reading + date conversions)
   useEffect(() => {
     const fetchLogs = async () => {
       try {
         setLoading(true);
+        setError(null);
+
         const userLogsCollection = collection(db, "userLogs");
-
-        let q = query(userLogsCollection);
-
-        // Add ordering by timestamp (most recent first)
-        if (
-          sortField === "timestamp" ||
-          sortField === "createdAt" ||
-          sortField === "updatedAt"
-        ) {
-          q = query(userLogsCollection, orderBy("createdAt", sortDirection));
-        }
-
+        const q = query(userLogsCollection, orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const logsData: UserLogEntry[] = [];
 
@@ -101,10 +100,10 @@ const UserLogsPage = () => {
 
           // Convert Firestore timestamps to readable dates
           const processDate = (dateField: any) => {
-            if (!dateField) return null;
+            if (dateField === null) return null; // explicit null preserved
+            if (!dateField && dateField !== 0) return null; // undefined / falsy -> null
             if (dateField?.toDate) return dateField.toDate();
             if (typeof dateField === "string") {
-              // Handle ISO string format like "2025-09-09T17:12:46.242Z"
               const date = new Date(dateField);
               return isNaN(date.getTime()) ? null : date;
             }
@@ -112,62 +111,43 @@ const UserLogsPage = () => {
             return null;
           };
 
-          // Process loginLogs array - FIXED: Handle the actual data structure
-          let mostRecentLogin: Date | null = null;
-          let mostRecentLogout: Date | null = null;
+          // Initialize loginLogs array if it doesn't exist or is not an array
+          let processedLoginLogs: {
+            lastLogin?: Date | null;
+            lastLogout?: Date | null;
+          }[] = [];
 
-          if (data.loginLogs && Array.isArray(data.loginLogs)) {
-            // Find the most recent login and logout from all entries
-            data.loginLogs.forEach((logEntry: any) => {
-              const loginDate = processDate(logEntry.lastLogin);
-              const logoutDate = processDate(logEntry.lastLogout);
-
-              if (
-                loginDate &&
-                (!mostRecentLogin || loginDate > mostRecentLogin)
-              ) {
-                mostRecentLogin = loginDate;
-              }
-
-              // Only consider logout if it's not null (null means still logged in)
-              if (
-                logoutDate &&
-                (!mostRecentLogout || logoutDate > mostRecentLogout)
-              ) {
-                mostRecentLogout = logoutDate;
-              }
-            });
-
-            // Check if the most recent entry has a null logout (still logged in)
-            const mostRecentEntry = data.loginLogs[data.loginLogs.length - 1];
-            if (mostRecentEntry && mostRecentEntry.lastLogout === null) {
-              // Find the corresponding login date for this null logout
-              const correspondingLogin = processDate(mostRecentEntry.lastLogin);
-              if (correspondingLogin) {
-                mostRecentLogin = correspondingLogin;
-                mostRecentLogout = null; // Explicitly set to null to indicate still logged in
-              }
-            }
+          if (data.loginLogs) {
+            const logsArray = Array.isArray(data.loginLogs)
+              ? data.loginLogs
+              : Object.values(data.loginLogs);
+            processedLoginLogs = logsArray.map((logEntry: any) => ({
+              lastLogin: processDate(logEntry.lastLogin),
+              lastLogout: logEntry.hasOwnProperty("lastLogout") // preserve explicit null
+                ? processDate(logEntry.lastLogout)
+                : undefined,
+            }));
+          } else {
+            const singleEntry = {
+              lastLogin: processDate(data.lastLogin),
+              lastLogout: data.hasOwnProperty("lastLogout")
+                ? processDate(data.lastLogout)
+                : undefined,
+            };
+            processedLoginLogs = [singleEntry];
           }
 
-          // Fetch admin role from admin collection
           const adminRole = await fetchAdminRole(
             data.uid || "",
             data.email || ""
           );
 
-          // Create a log entry for this document
           const logEntry: UserLogEntry = {
             id: docSnapshot.id,
             email: data.email || "",
             uid: data.uid || "",
             adminRole: adminRole,
-            loginLogs: [
-              {
-                lastLogin: mostRecentLogin,
-                lastLogout: mostRecentLogout,
-              },
-            ],
+            loginLogs: processedLoginLogs,
             timestamp:
               processDate(data.updatedAt) || processDate(data.createdAt),
             createdAt: processDate(data.createdAt),
@@ -176,48 +156,6 @@ const UserLogsPage = () => {
           };
 
           logsData.push(logEntry);
-        }
-
-        // Sort the data if not sorting by Firestore query
-        if (
-          sortField !== "timestamp" &&
-          sortField !== "createdAt" &&
-          sortField !== "updatedAt"
-        ) {
-          logsData.sort((a, b) => {
-            let aValue: any;
-            let bValue: any;
-
-            if (sortField === "lastLogin") {
-              aValue = a.loginLogs[0]?.lastLogin?.getTime() || 0;
-              bValue = b.loginLogs[0]?.lastLogin?.getTime() || 0;
-            } else if (sortField === "lastLogout") {
-              aValue = a.loginLogs[0]?.lastLogout?.getTime() || 0;
-              bValue = b.loginLogs[0]?.lastLogout?.getTime() || 0;
-            } else {
-              aValue = a[sortField as keyof UserLogEntry];
-              bValue = b[sortField as keyof UserLogEntry];
-            }
-
-            // Handle date sorting
-            if (aValue instanceof Date) aValue = aValue.getTime();
-            if (bValue instanceof Date) bValue = bValue.getTime();
-
-            // Handle string sorting
-            if (typeof aValue === "string") aValue = aValue.toLowerCase();
-            if (typeof bValue === "string") bValue = bValue.toLowerCase();
-
-            // Handle null/undefined values
-            if (aValue == null && bValue == null) return 0;
-            if (aValue == null) return 1;
-            if (bValue == null) return -1;
-
-            if (sortDirection === "asc") {
-              return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-            } else {
-              return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-            }
-          });
         }
 
         setLogs(logsData);
@@ -234,80 +172,118 @@ const UserLogsPage = () => {
     };
 
     fetchLogs();
-  }, [sortField, sortDirection]);
+  }, []);
 
-  // Filter and search logic
-  const filteredLogs = logs.filter((log) => {
-    const matchesSearch =
-      log.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.adminRole?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.uid?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === "all" || log.adminRole === roleFilter;
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "online" && isUserOnline(log)) ||
-      (statusFilter === "offline" && !isUserOnline(log));
-    return matchesSearch && matchesRole && matchesStatus;
+  // Helper: determine if a single session is online
+  const isSessionOnline = (session: {
+    lastLogin?: Date | null;
+    lastLogout?: Date | null;
+  }) => {
+    if (!session?.lastLogin) return false;
+    // explicit null in lastLogout => still logged in
+    if (session.lastLogout === null) return true;
+    // if no explicit lastLogout, treat as offline (so we don't accidentally mark unknown as online)
+    if (!session.lastLogout) return false;
+    return (
+      new Date(session.lastLogin).getTime() >
+      new Date(session.lastLogout).getTime()
+    );
+  };
+
+  // Flatten logs -> session rows (one row per loginLogs entry)
+  const sessionRows: SessionRow[] = logs.flatMap((log) => {
+    const sessionsSource =
+      log.loginLogs && Array.isArray(log.loginLogs) && log.loginLogs.length > 0
+        ? log.loginLogs
+        : [{ lastLogin: log.lastLogin || null, lastLogout: log.lastLogout }];
+    return sessionsSource.map((session, idx) => {
+      const loginTime = session?.lastLogin
+        ? new Date(session.lastLogin).getTime()
+        : 0;
+      const logoutTime = session?.lastLogout
+        ? new Date(session.lastLogout).getTime()
+        : 0;
+      const activityTime = Math.max(loginTime, logoutTime, 0);
+
+      return {
+        rowId: `${log.id}-${idx}`,
+        parentId: log.id,
+        email: log.email || "N/A",
+        uid: log.uid || "N/A",
+        adminRole: log.adminRole || "user",
+        lastLogin: session?.lastLogin ?? null,
+        lastLogout: session?.lastLogout ?? null,
+        activityTime,
+        isOnline: isSessionOnline(session),
+      };
+    });
   });
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  // Apply search, role, status filter and sort
+  const filteredSortedSessions = (() => {
+    const term = searchTerm.trim().toLowerCase();
+
+    const filtered = sessionRows.filter((s) => {
+      const matchesSearch =
+        !term ||
+        s.email.toLowerCase().includes(term) ||
+        s.adminRole.toLowerCase().includes(term) ||
+        s.uid.toLowerCase().includes(term);
+      const matchesRole = roleFilter === "all" || s.adminRole === roleFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "online" && s.isOnline) ||
+        (statusFilter === "offline" && !s.isOnline);
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+
+    // Sort: online first, then offline by most recent activity (desc)
+    filtered.sort((a, b) => {
+      if (a.isOnline && !b.isOnline) return -1;
+      if (!a.isOnline && b.isOnline) return 1;
+      return b.activityTime - a.activityTime;
+    });
+
+    return filtered;
+  })();
+
+  // Pagination for session rows
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredSortedSessions.length / itemsPerPage)
+  );
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedLogs = filteredLogs.slice(
+  const paginatedSessions = filteredSortedSessions.slice(
     startIndex,
     startIndex + itemsPerPage
   );
 
-  // Get unique roles for filter dropdown
+  // Unique roles for role filter (from session rows so it matches displayed rows)
   const uniqueRoles = [
-    ...new Set(logs.map((log) => log.adminRole).filter(Boolean)),
+    ...new Set(sessionRows.map((r) => r.adminRole).filter(Boolean)),
   ];
 
-  // Handle sorting
-  const handleSort = (field: string) => {
-    if (field === sortField) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("desc");
+  // Format date (works with Date or null)
+  const formatDate = (date: Date | string | number | undefined | null) => {
+    if (!date) return "Never";
+    try {
+      return new Date(date).toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Invalid Date";
     }
   };
 
-  // Format date
-  const formatDate = (date: Date | string | number | undefined | null) => {
-    if (!date) return "Never";
-    return new Date(date).toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  // --- define this BEFORE your return() ---
-  const isUserOnline = (log: UserLogEntry) => {
-    const sessions = log.loginLogs;
-    if (!sessions || sessions.length === 0) return false;
-
-    // Find latest session by login date
-    const latest = sessions.reduce((a, b) => {
-      const aLogin = a.lastLogin ? new Date(a.lastLogin).getTime() : 0;
-      const bLogin = b.lastLogin ? new Date(b.lastLogin).getTime() : 0;
-      return bLogin > aLogin ? b : a;
-    });
-
-    if (!latest.lastLogin) return false;
-    if (latest.lastLogout === null) return true;
-    if (!latest.lastLogout) return true;
-
-    return new Date(latest.lastLogin) > new Date(latest.lastLogout);
-  };
-
-  // Count online and offline users - count unique users by email/uid
+  // Keep unique user counts (same logic as before: choose latest timestamp per user)
   const getUniqueUsers = () => {
-    const userMap = new Map();
+    const userMap = new Map<string, { timestamp?: Date }>();
 
     logs.forEach((log) => {
       const identifier = log.email || log.uid;
@@ -318,18 +294,40 @@ const UserLogsPage = () => {
         !existing ||
         (log.timestamp &&
           existing.timestamp &&
-          log.timestamp > existing.timestamp)
+          log.timestamp > existing.timestamp) ||
+        (log.timestamp && !existing.timestamp)
       ) {
-        userMap.set(identifier, log);
+        userMap.set(identifier, { timestamp: log.timestamp });
       }
     });
 
-    return Array.from(userMap.values());
+    return Array.from(userMap.keys());
   };
 
   const uniqueUsers = getUniqueUsers();
-  const onlineUsers = uniqueUsers.filter((user) => isUserOnline(user)).length;
-  const offlineUsers = uniqueUsers.length - onlineUsers;
+  // Compute how many unique users currently online (if any of their sessions is online)
+  const uniqueUserOnlineCount = (() => {
+    const map = new Map<string, boolean>();
+    logs.forEach((log) => {
+      const id = log.email || log.uid;
+      if (!id) return;
+      const anyOnline = (log.loginLogs || []).some((s) => isSessionOnline(s));
+      if (map.has(id)) {
+        if (!map.get(id) && anyOnline) map.set(id, true);
+      } else {
+        map.set(id, anyOnline);
+      }
+    });
+    return Array.from(map.values()).filter(Boolean).length;
+  })();
+
+  const onlineUsers = uniqueUserOnlineCount;
+  const offlineUsers = Math.max(0, uniqueUsers.length - onlineUsers);
+
+  // Reset page when filters/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, statusFilter]);
 
   if (loading) {
     return (
@@ -376,6 +374,12 @@ const UserLogsPage = () => {
                   Error Loading Logs
                 </h3>
                 <p className="text-red-600">{error}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Retry
+                </button>
               </div>
             </div>
           </div>
@@ -469,7 +473,7 @@ const UserLogsPage = () => {
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
-                  {logs.length}
+                  {sessionRows.length}
                 </div>
                 <div className="text-slate-500">Total Logs</div>
               </div>
@@ -487,104 +491,16 @@ const UserLogsPage = () => {
                     #
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
-                    <button
-                      onClick={() => handleSort("email")}
-                      className="flex items-center gap-2 hover:text-blue-600 transition-colors"
-                    >
-                      User Email
-                      <svg
-                        className={`h-4 w-4 transition-transform ${
-                          sortField === "email" && sortDirection === "desc"
-                            ? "rotate-180"
-                            : ""
-                        }`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M7 10l5 5 5-5"
-                        />
-                      </svg>
-                    </button>
+                    User Email
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
-                    <button
-                      onClick={() => handleSort("adminRole")}
-                      className="flex items-center gap-2 hover:text-blue-600 transition-colors"
-                    >
-                      Role
-                      <svg
-                        className={`h-4 w-4 transition-transform ${
-                          sortField === "adminRole" && sortDirection === "desc"
-                            ? "rotate-180"
-                            : ""
-                        }`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M7 10l5 5 5-5"
-                        />
-                      </svg>
-                    </button>
+                    Role
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
-                    <button
-                      onClick={() => handleSort("lastLogin")}
-                      className="flex items-center gap-2 hover:text-blue-600 transition-colors"
-                    >
-                      Last Login
-                      <svg
-                        className={`h-4 w-4 transition-transform ${
-                          sortField === "lastLogin" && sortDirection === "desc"
-                            ? "rotate-180"
-                            : ""
-                        }`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M7 10l5 5 5-5"
-                        />
-                      </svg>
-                    </button>
+                    Last Login
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
-                    <button
-                      onClick={() => handleSort("lastLogout")}
-                      className="flex items-center gap-2 hover:text-blue-600 transition-colors"
-                    >
-                      Last Logout
-                      <svg
-                        className={`h-4 w-4 transition-transform ${
-                          sortField === "lastLogout" && sortDirection === "desc"
-                            ? "rotate-180"
-                            : ""
-                        }`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M7 10l5 5 5-5"
-                        />
-                      </svg>
-                    </button>
+                    Last Logout
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">
                     Status
@@ -592,109 +508,91 @@ const UserLogsPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {paginatedLogs.map((log, index) => {
-                  const isOnline = isUserOnline(log);
-                  const sequentialNumber = startIndex + index + 1;
+                {paginatedSessions.map((row, idx) => {
+                  const sequentialNumber = startIndex + idx + 1;
 
-                  return log.loginLogs.map((session, sessionIndex) => {
-                    const isOnline =
-                      session.lastLogout === null ||
-                      (session.lastLogin &&
-                        session.lastLogout &&
-                        session.lastLogin > session.lastLogout);
+                  return (
+                    <tr
+                      key={row.rowId}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">
+                          {sequentialNumber}
+                        </span>
+                      </td>
 
-                    return (
-                      <tr
-                        key={`${log.id}-${index}-${sessionIndex}`}
-                        className="hover:bg-slate-50 transition-colors"
-                      >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center">
-                            <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">
-                              {sequentialNumber}.{sessionIndex + 1}
-                            </span>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
+                            {(row.email?.charAt(0) || "U").toUpperCase()}
                           </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
-                                {log.email?.charAt(0).toUpperCase() ||
-                                  log.uid?.charAt(0).toUpperCase() ||
-                                  "U"}
-                              </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-semibold text-slate-900">
+                              {row.email}
                             </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-semibold text-slate-900">
-                                {log.email || "N/A"}
-                              </div>
-                              <div className="text-sm text-slate-500">
-                                UID: {log.uid || "N/A"}
-                              </div>
+                            <div className="text-sm text-slate-500">
+                              UID: {row.uid}
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
-                              log.adminRole === "superAdmin"
-                                ? "bg-purple-100 text-purple-800"
-                                : log.adminRole === "admin"
-                                ? "bg-blue-100 text-blue-800"
-                                : log.adminRole === "moderator"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-slate-100 text-slate-800"
-                            }`}
-                          >
-                            {log.adminRole || "user"}
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                            row.adminRole === "superAdmin"
+                              ? "bg-purple-100 text-purple-800"
+                              : row.adminRole === "admin"
+                              ? "bg-blue-100 text-blue-800"
+                              : row.adminRole === "moderator"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-slate-100 text-slate-800"
+                          }`}
+                        >
+                          {row.adminRole}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4">{formatDate(row.lastLogin)}</td>
+
+                      <td className="px-6 py-4">
+                        {row.lastLogout === null ? (
+                          <span className="text-green-600 font-medium">
+                            Still logged in
                           </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-slate-900">
-                            {session.lastLogin
-                              ? formatDate(session.lastLogin)
-                              : "Never"}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-slate-900">
-                            {session.lastLogout === null ? (
-                              <span className="text-green-600 font-medium">
-                                Still logged in
-                              </span>
-                            ) : session.lastLogout ? (
-                              formatDate(session.lastLogout)
-                            ) : (
-                              <span className="text-slate-500">No logout</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
+                        ) : row.lastLogout ? (
+                          formatDate(row.lastLogout)
+                        ) : (
+                          "No logout"
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            row.isOnline
+                              ? "bg-green-100 text-green-800"
+                              : "bg-slate-100 text-slate-800"
+                          }`}
+                        >
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              isOnline
-                                ? "bg-green-100 text-green-800"
-                                : "bg-slate-100 text-slate-800"
+                            className={`h-1.5 w-1.5 rounded-full mr-1.5 ${
+                              row.isOnline ? "bg-green-400" : "bg-slate-400"
                             }`}
-                          >
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full mr-1.5 ${
-                                isOnline ? "bg-green-400" : "bg-slate-400"
-                              }`}
-                            ></span>
-                            {isOnline ? "Online" : "Offline"}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  });
+                          />
+                          {row.isOnline ? "Online" : "Offline"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
                 })}
               </tbody>
             </table>
           </div>
 
           {/* Empty State */}
-          {filteredLogs.length === 0 && !loading && (
+          {filteredSortedSessions.length === 0 && !loading && (
             <div className="text-center py-12">
               <svg
                 className="mx-auto h-12 w-12 text-slate-400"
@@ -724,8 +622,11 @@ const UserLogsPage = () => {
               <div className="flex items-center justify-between">
                 <div className="text-sm text-slate-700">
                   Showing {startIndex + 1} to{" "}
-                  {Math.min(startIndex + itemsPerPage, filteredLogs.length)} of{" "}
-                  {filteredLogs.length} results
+                  {Math.min(
+                    startIndex + itemsPerPage,
+                    filteredSortedSessions.length
+                  )}{" "}
+                  of {filteredSortedSessions.length} results
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
@@ -738,26 +639,25 @@ const UserLogsPage = () => {
                     Previous
                   </button>
 
-                  {/* Page Numbers */}
                   <div className="flex space-x-1">
-                    {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                      const pageNum = i + 1;
+                    {Array.from({ length: totalPages }).map((_, i) => {
+                      const page = i + 1;
                       return (
                         <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
+                          key={`page-${page}`}
+                          onClick={() => setCurrentPage(page)}
                           className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                            currentPage === pageNum
+                            currentPage === page
                               ? "bg-blue-600 text-white"
                               : "text-slate-700 bg-white border border-slate-300 hover:bg-slate-50"
                           }`}
                         >
-                          {pageNum}
+                          {page}
                         </button>
                       );
                     })}
                   </div>
-                  <p>hahaha</p>
+
                   <button
                     onClick={() =>
                       setCurrentPage((prev) => Math.min(prev + 1, totalPages))
