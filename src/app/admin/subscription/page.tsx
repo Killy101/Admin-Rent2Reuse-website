@@ -449,31 +449,6 @@ export default function PlansManagementPage() {
           transition={{ delay: 0.4, duration: 0.8 }}
           className="flex items-center justify-between mb-10 bg-white/60 backdrop-blur-lg rounded-3xl shadow-xl p-8 border border-white/30"
         >
-          {/* <div className="flex space-x-4">
-            <Link
-              href="/admin/subscription/subscriptionsList"
-              className="group relative flex items-center px-8 py-4 text-slate-600 bg-white/80 rounded-2xl shadow-lg border border-white/50 hover:bg-white transition-all duration-300 hover:shadow-xl font-semibold"
-            >
-              <motion.div
-                whileHover={{ scale: 1.1 }}
-                className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"
-              />
-              <Shield className="h-6 w-6 mr-3 relative z-10" />
-              <span className="relative z-10">Subscribers List</span>
-            </Link>
-
-            <button className="group relative flex items-center px-8 py-4 text-white bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl font-bold shadow-xl border border-white/20 transition-all duration-300 hover:shadow-2xl hover:scale-105">
-              <motion.div
-                whileHover={{ rotate: 360 }}
-                transition={{ duration: 0.5 }}
-              >
-                <Users className="h-6 w-6 mr-3" />
-              </motion.div>
-              Plans Management
-              <Sparkles className="h-4 w-4 ml-2" />
-            </button>
-          </div> */}
-
           <motion.button
             onClick={openAddPlanModal}
             whileHover={{ scale: 1.05 }}

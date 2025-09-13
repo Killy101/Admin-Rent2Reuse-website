@@ -9,6 +9,7 @@ import {
   doc,
   getDoc,
 } from "firebase/firestore";
+import { motion } from "framer-motion";
 import { db } from "@/app/firebase/config";
 
 type UserLogEntry = {
@@ -392,48 +393,69 @@ const UserLogsPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-800 mb-2">
-            User Login Logs
-          </h1>
-          <p className="text-slate-600">
-            Monitor user login and logout activities from userLogs collection
-          </p>
-        </div>
 
-        {/* Filters and Search */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-              {/* Search */}
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg
-                    className="h-5 w-5 text-slate-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
+        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
+          {/* Header Section */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center mb-12"
+            >
+              <div className="inline-flex items-center gap-3 mb-4">
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg">
+                  <img
+                    src="/assets/logoWhite.png"
+                    className="w-8 h-8 object-contain"
+                    alt="Logo"
+                  />
                 </div>
-                <input
-                  type="text"
-                  placeholder="Search by email, role, or UID..."
-                  className="pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full sm:w-80"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+                <div>
+                  <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-teal-600 bg-clip-text text-transparent">
+                    User Login Logs
+                  </h1>
+                  <p className="text-lg text-gray-600 mt-2">
+                    Monitor user login and logout activities from userLogs
+                    collection
+                  </p>
+                </div>
               </div>
+              <div className="w-24 h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mx-auto"></div>
+            </motion.div>
+          </div>
 
-              {/* Role Filter */}
+          {/* Filters and Search Section */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg
+                  className="h-5 w-5 text-slate-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Search by email, role, or UID..."
+                className="pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* Role Filter */}
+            <div className="md:w-48">
               <select
-                className="px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
               >
@@ -444,10 +466,12 @@ const UserLogsPage = () => {
                   </option>
                 ))}
               </select>
+            </div>
 
-              {/* Status Filter */}
+            {/* Status Filter */}
+            <div className="md:w-48">
               <select
-                className="px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -456,27 +480,27 @@ const UserLogsPage = () => {
                 <option value="offline">Offline Only</option>
               </select>
             </div>
+          </div>
 
-            {/* User Status Stats */}
-            <div className="flex gap-6 text-sm">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {onlineUsers}
-                </div>
-                <div className="text-slate-500">Online</div>
+          {/* User Status Stats */}
+          <div className="grid grid-cols-3 gap-6 text-center">
+            <div>
+              <div className="text-2xl font-bold text-green-600">
+                {onlineUsers}
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-slate-600">
-                  {offlineUsers}
-                </div>
-                <div className="text-slate-500">Offline</div>
+              <div className="text-slate-500">Online</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-slate-600">
+                {offlineUsers}
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {sessionRows.length}
-                </div>
-                <div className="text-slate-500">Total Logs</div>
+              <div className="text-slate-500">Offline</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-blue-600">
+                {sessionRows.length}
               </div>
+              <div className="text-slate-500">Total Logs</div>
             </div>
           </div>
         </div>
