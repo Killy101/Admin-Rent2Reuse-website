@@ -19,13 +19,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     setIsClient(true);
   }, []);
-
-  //   useEffect(() => {
-  //     if (isClient && !loading && !user) {
-  //       router.push("/");
-  //     }
-  //   }, [user, loading, isClient, router]);
-  //   if (!user) return null;
+(!user) return null;
 
   return (
     <div className="flex min-h-screen bg-white text-gray-900">
