@@ -326,21 +326,15 @@ export default function ChangePasswordPage() {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-indigo-200/30 to-blue-200/30 rounded-full blur-3xl"></div>
       </div>
 
-      <Card className="w-full max-w-lg shadow-2xl border-0 bg-white/80 backdrop-blur-sm relative z-10">
+      <Card className="w-full max-w-lg shadow-2xl border-0 bg-white/80 backdrop-blur-sm relative p-6   z-10">
         <CardHeader className="space-y-4 pb-6">
-          <div className="flex items-center gap-3 mb-2">
-            <Link
-              href="/admin"
-              className="text-sm text-gray-500 hover:text-indigo-600 flex items-center gap-2 transition-colors duration-200 group"
-            >
-              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
-              Back to Dashboard
-            </Link>
-          </div>
-
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg">
-              <Shield className="h-6 w-6 text-white" />
+            <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg">
+              <img
+                src="/assets/logoWhite.png"
+                className="w-8 h-8 object-contain"
+                alt="Logo"
+              />
             </div>
             <div>
               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -568,7 +562,7 @@ export default function ChangePasswordPage() {
 
             <Button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
+              className="w-full  items-center py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
               disabled={loading}
             >
               {loading ? (
@@ -578,13 +572,25 @@ export default function ChangePasswordPage() {
                 </>
               ) : (
                 <>
-                  <Shield className="h-5 w-5 mr-2" />
+                  <img
+                    src="/assets/logoWhite.png"
+                    className="w-5 h-6     object-contain"
+                    alt="Logo"
+                  />
                   Change Password
                 </>
               )}
             </Button>
           </form>
-
+          <div className="flex items-center gap-3 mb-2">
+            <Link
+              href="/admin"
+              className="text-sm text-gray-500 hover:text-indigo-600 flex items-center gap-2 transition-colors duration-200 group"
+            >
+              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
+              Back to Dashboard
+            </Link>
+          </div>
           {message && (
             <Alert
               variant={success ? "default" : "destructive"}

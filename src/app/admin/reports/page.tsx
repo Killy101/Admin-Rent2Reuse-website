@@ -52,15 +52,15 @@ import { useRouter } from "next/navigation";
 // Interface for message structure
 interface SupportTicket {
   id: string;
-  reporterId? : string;     
-  userId: string;           // reportedUserId
-  email: string;           // reporterEmail  
-  subject: string;         // reason
-  reason?: string;         // category
+  reporterId?: string;
+  userId: string; // reportedUserId
+  email: string; // reporterEmail
+  subject: string; // reason
+  reason?: string; // category
   messages: Message[];
   priority: "Low" | "Medium" | "High";
   status: "open" | "in_progress" | "resolved" | "closed";
-  date: string;           // createdAt
+  date: string; // createdAt
   description: string;
   isUnread: boolean;
   lastReadAt?: string;
@@ -103,26 +103,37 @@ interface CSVReport {
 // Update the interfaces first
 interface UserReport {
   id: string;
-  reporterId: string;        // User who made the report
-  reporterName: string;      // Populated from users collection
-  reporterEmail: string;     // Populated from users collection
-  reportedUserId: string;    // User being reported
-  reportedUserName: string;  // Populated from users collection
-  reason: string;           // Brief reason/title
-  description: string;      // Detailed description
-  category: 'harassment' | 'fraud' | 'inappropriate_content' | 'spam' | 'item_misrepresentation' | 'unauthorized_sales' | 'scams' | 'other';
-  status: 'pending' | 'investigating' | 'resolved' | 'dismissed';
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  reporterId: string; // User who made the report
+  reporterName: string; // Populated from users collection
+  reporterEmail: string; // Populated from users collection
+  reportedUserId: string; // User being reported
+  reportedUserName: string; // Populated from users collection
+  reason: string; // Brief reason/title
+  description: string; // Detailed description
+  category:
+    | "harassment"
+    | "fraud"
+    | "inappropriate_content"
+    | "spam"
+    | "item_misrepresentation"
+    | "unauthorized_sales"
+    | "scams"
+    | "other";
+  status: "pending" | "investigating" | "resolved" | "dismissed";
+  priority: "low" | "medium" | "high" | "critical";
   createdAt: any;
   updatedAt?: any;
-  evidence?: string[];      // URLs to evidence files/images
+  evidence?: string[]; // URLs to evidence files/images
   adminNotes?: string;
-  actionTaken?: 'none' | 'warning' | 'temporary_suspension' | 'permanent_suspension';
+  actionTaken?:
+    | "none"
+    | "warning"
+    | "temporary_suspension"
+    | "permanent_suspension";
   resolvedAt?: any;
-  resolvedBy?: string;      // Admin who resolved it
-  messages?: Message[];     // Optional messages array
+  resolvedBy?: string; // Admin who resolved it
+  messages?: Message[]; // Optional messages array
 }
-
 
 const AdminSupportPage = () => {
   // State management for tickets and UI controls
@@ -167,21 +178,23 @@ const AdminSupportPage = () => {
   // Fetch user reports (for user management page)
   // Add state for user reports and selected user reports
   const [userReports, setUserReports] = useState<UserReport[]>([]);
-  const [selectedUserReports, setSelectedUserReports] = useState<UserReport[]>([]);
+  const [selectedUserReports, setSelectedUserReports] = useState<UserReport[]>(
+    []
+  );
 
   const fetchUserReports = useCallback(async (userId?: string) => {
     try {
       // Use consistent collection name
       const reportsRef = collection(db, "reports"); // or "userReports" - be consistent
       let q = query(reportsRef, where("status", "==", "pending"));
-      
+
       if (userId) {
         q = query(reportsRef, where("reportedUserId", "==", userId));
       }
-      
+
       const querySnapshot = await getDocs(q);
       const reports: UserReport[] = [];
-      
+
       // Get all unique user IDs for batch fetching
       const userIds = new Set<string>();
       querySnapshot.forEach((doc) => {
@@ -189,9 +202,9 @@ const AdminSupportPage = () => {
         userIds.add(data.reporterId);
         userIds.add(data.reportedUserId);
       });
-      
+
       // Fetch user data for names
-      const usersMap = new Map<string, {name: string, email: string}>();
+      const usersMap = new Map<string, { name: string; email: string }>();
       if (userIds.size > 0) {
         const userPromises = Array.from(userIds).map(async (uid) => {
           try {
@@ -199,35 +212,43 @@ const AdminSupportPage = () => {
             if (userDoc.exists()) {
               const userData = userDoc.data();
               usersMap.set(uid, {
-                name: `${userData.firstname || ''} ${userData.lastname || ''}`.trim(),
-                email: userData.email || ''
+                name: `${userData.firstname || ""} ${
+                  userData.lastname || ""
+                }`.trim(),
+                email: userData.email || "",
               });
             }
           } catch (error) {
             console.error(`Error fetching user ${uid}:`, error);
-            usersMap.set(uid, { name: 'Unknown User', email: '' });
+            usersMap.set(uid, { name: "Unknown User", email: "" });
           }
         });
         await Promise.all(userPromises);
       }
-      
+
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        const reporter = usersMap.get(data.reporterId) || { name: 'Unknown User', email: '' };
-        const reported = usersMap.get(data.reportedUserId) || { name: 'Unknown User', email: '' };
-        
+        const reporter = usersMap.get(data.reporterId) || {
+          name: "Unknown User",
+          email: "",
+        };
+        const reported = usersMap.get(data.reportedUserId) || {
+          name: "Unknown User",
+          email: "",
+        };
+
         reports.push({
           id: doc.id,
-          reporterId: data.reporterId || '',
+          reporterId: data.reporterId || "",
           reporterName: reporter.name,
           reporterEmail: reporter.email,
-          reportedUserId: data.reportedUserId || '',
+          reportedUserId: data.reportedUserId || "",
           reportedUserName: reported.name,
-          reason: data.reason || '',
-          description: data.description || '',
-          category: data.category || 'other',
-          status: data.status || 'pending',
-          priority: data.priority || 'medium',
+          reason: data.reason || "",
+          description: data.description || "",
+          category: data.category || "other",
+          status: data.status || "pending",
+          priority: data.priority || "medium",
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
           evidence: data.evidence || [],
@@ -237,7 +258,7 @@ const AdminSupportPage = () => {
           resolvedBy: data.resolvedBy,
         } as UserReport);
       });
-      
+
       setUserReports(reports);
       if (userId) {
         setSelectedUserReports(reports);
@@ -256,7 +277,7 @@ const AdminSupportPage = () => {
     try {
       const reportsSnapshot = await getDocs(collection(db, "reports"));
       const reportsData: UserReport[] = [];
-      
+
       // Get all unique user IDs for batch fetching
       const userIds = new Set<string>();
       reportsSnapshot.docs.forEach((doc) => {
@@ -264,9 +285,9 @@ const AdminSupportPage = () => {
         userIds.add(data.reporterId);
         userIds.add(data.reportedUserId);
       });
-      
+
       // Fetch user data
-      const usersMap = new Map<string, {name: string, email: string}>();
+      const usersMap = new Map<string, { name: string; email: string }>();
       if (userIds.size > 0) {
         const userPromises = Array.from(userIds).map(async (uid) => {
           try {
@@ -274,8 +295,10 @@ const AdminSupportPage = () => {
             if (userDoc.exists()) {
               const userData = userDoc.data();
               usersMap.set(uid, {
-                name: `${userData.firstname || ''} ${userData.lastname || ''}`.trim(),
-                email: userData.email || ''
+                name: `${userData.firstname || ""} ${
+                  userData.lastname || ""
+                }`.trim(),
+                email: userData.email || "",
               });
             }
           } catch (error) {
@@ -284,24 +307,30 @@ const AdminSupportPage = () => {
         });
         await Promise.all(userPromises);
       }
-      
+
       reportsSnapshot.docs.forEach((doc) => {
         const data = doc.data();
-        const reporter = usersMap.get(data.reporterId) || { name: 'Unknown User', email: '' };
-        const reported = usersMap.get(data.reportedUserId) || { name: 'Unknown User', email: '' };
-        
+        const reporter = usersMap.get(data.reporterId) || {
+          name: "Unknown User",
+          email: "",
+        };
+        const reported = usersMap.get(data.reportedUserId) || {
+          name: "Unknown User",
+          email: "",
+        };
+
         reportsData.push({
           id: doc.id,
-          reporterId: data.reporterId || '',
+          reporterId: data.reporterId || "",
           reporterName: reporter.name,
           reporterEmail: reporter.email,
-          reportedUserId: data.reportedUserId || '',
+          reportedUserId: data.reportedUserId || "",
           reportedUserName: reported.name,
-          reason: data.reason || '',
-          description: data.description || '',
-          category: data.category || 'other',
-          status: data.status || 'pending',
-          priority: data.priority || 'medium',
+          reason: data.reason || "",
+          description: data.description || "",
+          category: data.category || "other",
+          status: data.status || "pending",
+          priority: data.priority || "medium",
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
           evidence: data.evidence || [],
@@ -334,10 +363,20 @@ const AdminSupportPage = () => {
         subject: report.reason,
         reason: report.category,
         messages: report.messages || [], // Initialize empty, will be populated from messages field if exists
-        priority: report.priority === 'low' ? 'Low' : report.priority === 'high' ? 'High' : 'Medium',
-        status: report.status === 'resolved' ? 'resolved' : 
-                report.status === 'investigating' ? 'in_progress' : 
-                report.status === 'dismissed' ? 'closed' : 'open',
+        priority:
+          report.priority === "low"
+            ? "Low"
+            : report.priority === "high"
+            ? "High"
+            : "Medium",
+        status:
+          report.status === "resolved"
+            ? "resolved"
+            : report.status === "investigating"
+            ? "in_progress"
+            : report.status === "dismissed"
+            ? "closed"
+            : "open",
         date: formatDate(report.createdAt),
         description: report.description,
         isUnread: true,
@@ -381,7 +420,6 @@ const AdminSupportPage = () => {
         updatedAt: new Date().toISOString(),
       });
 
-      
       if (!selectedTicket.reporterId) {
         toast.error("Reporter ID is missing. Cannot send notification.");
         setIsLoading(false);
@@ -396,7 +434,9 @@ const AdminSupportPage = () => {
       await addDoc(userNotificationsRef, {
         type: "REPORT_RESPONSE",
         title: "Report Update",
-        message: `Admin has responded to your report: ${selectedTicket.reason} - ${replyMessage.substring(0, 250)}...`,
+        message: `Admin has responded to your report: ${
+          selectedTicket.reason
+        } - ${replyMessage.substring(0, 250)}...`,
         reportId: selectedTicket.id,
         reportReason: selectedTicket.reason,
         isRead: false,
