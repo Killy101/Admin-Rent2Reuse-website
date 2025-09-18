@@ -535,13 +535,17 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
                     Secure login portal for authorized administrators
                   </p>
                 </div>
+                <div className="flex justify-center items-center">
                 <Image
                   src="/assets/loginCard.png"
-                  alt="Login"
+                  alt="Login card"
                   width={300}
-                  height={300}
-                  className="mx-auto"
+                  height={347}
+                  sizes="(max-width: 600px) 100vw, 300px"
+                  quality={60}
+                  priority
                 />
+                </div>
               </div>
 
               {/* Background Pattern */}

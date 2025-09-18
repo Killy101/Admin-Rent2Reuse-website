@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { signOut } from "firebase/auth";
@@ -29,7 +29,9 @@ import {
   where,
   getDocs,
   updateDoc,
-  onSnapshot, // ✅ real Firebase helper
+  onSnapshot,
+  doc,
+  Unsubscribe,
 } from "firebase/firestore";
 
 import { ChevronDown, Loader2 } from "lucide-react";
@@ -47,6 +49,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AdminAuthCheck } from "@/components/auth/AdminAuthCheck";
 
+// Memoized styles to prevent object recreation
 const sidebarStyles = {
   nav: "flex-1 overflow-y-auto px-4 py-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent",
   navItem:
@@ -63,9 +66,9 @@ const sidebarStyles = {
   dropdownInactive:
     "text-gray-700 hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-100 hover:shadow-md",
   subItem: "w-full rounded-lg transition-all duration-300 hover:pl-6",
-};
+} as const;
 
-// Navigation items array - Updated with better naming
+// Move static data outside component to prevent recreation
 const navigationItems = [
   {
     name: "Dashboard",
@@ -91,12 +94,6 @@ const navigationItems = [
     icon: RiTeamLine,
     description: "Manage admin team members",
   },
-  // {
-  //   name: "User Directory",
-  //   href: "/admin/user",
-  //   icon: PiUserList,
-  //   description: "View all registered users",
-  // },
   {
     name: "Transactions",
     href: "/admin/transaction",
@@ -133,19 +130,14 @@ const navigationItems = [
     icon: MdOutlinePeople,
     description: "View user activity logs",
   },
-];
+] as const;
 
-// Enhanced role access configuration with more granular permissions
-const roleAccess: {
-  superAdmin: ["*"];
-  admin: ["*"];
-  support: string[];
-  manageUsers: string[];
-  financialViewer: string[];
-  contentManager: string[];
-} = {
-  superAdmin: ["*"],
-  admin: ["*"],
+// Role access configuration with frozen object for better performance
+type AllowedPath = string | "*";
+
+const roleAccess = Object.freeze({
+  superAdmin: ["*"] as AllowedPath[],
+  admin: ["*"] as AllowedPath[],
   support: [
     "/admin",
     "/admin/support",
@@ -153,7 +145,7 @@ const roleAccess: {
     "/admin/announcements",
     "/admin/subscription/subscriptionsList",
     "/admin/profile",
-  ],
+  ] as AllowedPath[],
   manageUsers: [
     "/admin",
     "/admin/manageUsers",
@@ -161,104 +153,96 @@ const roleAccess: {
     "/admin/transaction",
     "/admin/subscription",
     "/admin/profile",
-  ],
-  // New role suggestions
+  ] as AllowedPath[],
   financialViewer: [
     "/admin",
     "/admin/transaction",
     "/admin/subscription",
     "/admin/profile",
-  ],
+  ] as AllowedPath[],
   contentManager: [
     "/admin",
     "/admin/itemList",
     "/admin/announcements",
     "/admin/profile",
-  ],
-};
+  ] as AllowedPath[],
+});
 
-// Function to check if user has access to a specific path
+// Memoized role-specific restrictions
+const roleRestrictions = Object.freeze({
+  support: new Set([
+    "User Management",
+    "Team Members",
+    "Transactions",
+    "Item List",
+  ]),
+  manageUsers: new Set([
+    "Team Members",
+    "Support Tickets",
+    "User Issues",
+    "Announcements",
+  ]),
+  financialViewer: new Set(["Dashboard", "Transactions", "Subscriptions"]),
+  contentManager: new Set(["Dashboard", "Item List", "Announcements"]),
+});
+
+// Optimized access check with memoization
 const hasAccess = (adminRole: string | null, path: string): boolean => {
   if (!adminRole || !path) return false;
 
   const allowedPaths = roleAccess[adminRole as keyof typeof roleAccess];
-  if (!allowedPaths) return false;
-
-  // SuperAdmin has access to everything
   if (allowedPaths.includes("*")) return true;
 
-  // Check if path matches any allowed paths
+  if (allowedPaths.includes("*" as any)) return true;
+
   return allowedPaths.some(
     (allowedPath) => path === allowedPath || path.startsWith(allowedPath)
   );
 };
 
-// Function to filter navigation items based on admin role
+// Memoized navigation filter
 const getFilteredNavigationItems = (adminRole: string | null) => {
   if (!adminRole) return [];
 
   return navigationItems.filter((item) => {
     if (!item.href) return false;
 
-    // Check access for this specific item
     const hasItemAccess = hasAccess(adminRole, item.href);
 
-    // Additional role-specific filtering
-    if (adminRole === "support") {
-      // Support role restrictions
-      const restrictedItems = [
-        "User Management",
-        "Team Members",
-        "Transactions",
-        "Item List",
-      ];
-      if (restrictedItems.includes(item.name)) {
-        return false;
+    // Use Set lookup for better performance
+    const restrictions =
+      roleRestrictions[adminRole as keyof typeof roleRestrictions];
+    if (restrictions) {
+      if (adminRole === "financialViewer" || adminRole === "contentManager") {
+        return restrictions.has(item.name);
       }
-    }
-
-    if (adminRole === "manageUsers") {
-      // User management role restrictions
-      const restrictedItems = [
-        "Team Members",
-        "Support Tickets",
-        "User Issues",
-        "Announcements",
-      ];
-      if (restrictedItems.includes(item.name)) {
-        return false;
-      }
-    }
-
-    if (adminRole === "financialViewer") {
-      // Financial viewer restrictions
-      const allowedItems = ["Dashboard", "Transactions", "Subscriptions"];
-      return allowedItems.includes(item.name);
-    }
-
-    if (adminRole === "contentManager") {
-      // Content manager restrictions
-      const allowedItems = ["Dashboard", "Item List", "Announcements"];
-      return allowedItems.includes(item.name);
+      return !restrictions.has(item.name);
     }
 
     return hasItemAccess;
   });
 };
 
+// Types
 interface SidebarProps {
   currentPath?: string;
 }
 
-// Loading skeleton component
-const SidebarSkeleton = () => (
+interface UserData {
+  username: string | null;
+  adminRole: string | null;
+  profileImageUrl: string | null;
+}
+
+// Memoized skeleton component
+const SidebarSkeleton = memo(() => (
   <div className="w-64 bg-gradient-to-b from-white to-gray-50/50 border-r flex flex-col h-screen sticky top-0 shadow-xl backdrop-blur-sm">
     <div className="flex-1 flex flex-col">
       <div className="p-6 mb-2 flex justify-center">
         <div className="h-8 w-32 bg-gray-200 animate-pulse rounded" />
       </div>
       <nav className="flex-1 px-4">
-        {[...Array(6)].map((_, i) => (
+        {Array.from({ length: 6 }, (_, i) => (
           <div
             key={i}
             className="h-12 bg-gray-100 animate-pulse rounded-lg mb-2"
@@ -274,14 +258,49 @@ const SidebarSkeleton = () => (
       </div>
     </div>
   </div>
+));
+
+SidebarSkeleton.displayName = "SidebarSkeleton";
+
+// Memoized navigation item component
+const NavigationItem = memo(
+  ({
+    item,
+    isActive,
+    onClick,
+  }: {
+    item: (typeof navigationItems)[number];
+    isActive: boolean;
+    onClick?: () => void;
+  }) => (
+    <Link
+      href={item.href || "#"}
+      className={cn(
+        sidebarStyles.navItem,
+        isActive ? sidebarStyles.activeNavItem : sidebarStyles.inactiveNavItem
+      )}
+      aria-label={item.description}
+      onClick={onClick}
+    >
+      <item.icon className={cn(sidebarStyles.icon, "mr-3")} />
+      <span className="font-medium">{item.name}</span>
+      {isActive && (
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-l-full shadow-sm" />
+      )}
+    </Link>
+  )
 );
 
-// Main client sidebar component
-const ClientSidebar = ({ currentPath }: SidebarProps) => {
+NavigationItem.displayName = "NavigationItem";
+
+// Main client sidebar component with optimizations
+const ClientSidebar = memo(({ currentPath }: SidebarProps) => {
   const [user, loading, error] = useAuthState(auth);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [username, setUsername] = useState<string | null>(null);
-  const [adminRole, setAdminRole] = useState<string | null>(null);
+  const [userData, setUserData] = useState<UserData>({
+    username: null,
+    adminRole: null,
+    profileImageUrl: null,
+  });
   const [userDataLoading, setUserDataLoading] = useState(true);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -289,288 +308,15 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
 
   const pathname = usePathname();
 
-  // Handle mounting
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Set up user data listener
-  useEffect(() => {
-    if (!user || loading) {
-      setUserDataLoading(false);
-      return;
-    }
-
-    setUserDataLoading(true);
-    console.log("Setting up real-time listener for admin data:", user.email);
-
-    try {
-      const adminQuery = query(
-        collection(db, "admin"),
-        where("email", "==", user.email)
-      );
-
-      const unsubscribe = onSnapshot(adminQuery, {
-        next: (querySnapshot) => {
-          if (!querySnapshot.empty) {
-            const adminDoc = querySnapshot.docs[0];
-            const adminData = adminDoc.data();
-            console.log(
-              "ð Real-time update received for admin data:",
-              adminData
-            );
-
-            setUsername(adminData.username || null);
-            setAdminRole(adminData.adminRole || null);
-            setProfileImage(adminData.profileImageUrl || null);
-            setImageError(false);
-
-            // Update localStorage
-            if (adminData.adminRole) {
-              localStorage.setItem("adminRole", adminData.adminRole);
-            }
-
-            console.log("â Updated sidebar state with new data:", {
-              username: adminData.username,
-              adminRole: adminData.adminRole,
-              profileImage: adminData.profileImageUrl,
-            });
-          } else {
-            console.warn("â ï¸ No admin document found for email:", user.email);
-            setUsername(null);
-            setAdminRole(null);
-            setProfileImage(null);
-            localStorage.removeItem("adminRole");
-          }
-          setUserDataLoading(false);
-        },
-        error: (error) => {
-          console.error("â Error in admin data listener:", error);
-          setUsername(null);
-          setAdminRole(null);
-          setProfileImage(null);
-          setUserDataLoading(false);
-          localStorage.removeItem("adminRole");
-        },
-      });
-
-      // Cleanup listener on unmount
-      return () => {
-        console.log("ð§¹ Cleaning up admin data listener");
-        unsubscribe();
-      };
-    } catch (error) {
-      console.error("â Error setting up admin data listener:", error);
-      setUserDataLoading(false);
-    }
-  }, [user, loading]);
-
-  // Handle image error
-  const handleImageError = useCallback(() => {
-    setImageError(true);
-    setProfileImage(null);
-  }, []);
-
-  // Handle logout function
-  // Replace the handleLogout function in your sidebar component with this updated version:
-
-  const handleLogout = useCallback(async () => {
-    setLogoutLoading(true);
-    try {
-      if (user) {
-        console.log("Starting logout process for user:", user.uid);
-
-        // Update logout time in userLogs collection
-        const userLogsQuery = query(
-          collection(db, "userLogs"),
-          where("uid", "==", user.uid)
-        );
-        const userLogsSnapshot = await getDocs(userLogsQuery);
-
-        if (!userLogsSnapshot.empty) {
-          const userLogDoc = userLogsSnapshot.docs[0];
-          const userLogData = userLogDoc.data();
-          const loginLogs = userLogData.loginLogs || [];
-
-          if (loginLogs.length > 0) {
-            // Find the most recent login entry with null logout
-            const updatedLogs = [...loginLogs];
-            const lastActiveIndex = updatedLogs.findIndex(
-              (log) => log.lastLogout === null
-            );
-
-            if (lastActiveIndex !== -1) {
-              // Update the logout time for the active session
-              updatedLogs[lastActiveIndex] = {
-                ...updatedLogs[lastActiveIndex],
-                lastLogout: new Date().toISOString(),
-              };
-
-              // Update the userLogs document
-              await updateDoc(userLogDoc.ref, {
-                loginLogs: updatedLogs,
-                updatedAt: new Date(),
-              });
-
-              console.log("Successfully updated logout time in userLogs");
-            } else {
-              console.warn("No active session found to logout");
-            }
-          }
-        } else {
-          console.warn("No userLogs document found for user:", user.uid);
-        }
-
-        // Also update admin collection with lastLogout (for backward compatibility)
-        const adminQuery = query(
-          collection(db, "admin"),
-          where("uid", "==", user.uid)
-        );
-        const adminSnapshot = await getDocs(adminQuery);
-
-        if (!adminSnapshot.empty) {
-          const adminDoc = adminSnapshot.docs[0];
-          await updateDoc(adminDoc.ref, {
-            lastLogout: new Date(),
-          });
-          console.log("Updated lastLogout in admin collection");
-        }
-      }
-
-      // Clear localStorage
-      localStorage.removeItem("adminRole");
-      localStorage.removeItem("adminUid");
-      localStorage.removeItem("isAuthenticated");
-
-      // Sign out from Firebase Auth
-      await signOut(auth);
-
-      console.log("Sidebar logout completed successfully");
-    } catch (error) {
-      console.error("Error signing out:", error);
-      // Still attempt to sign out even if Firestore update fails
-      try {
-        await signOut(auth);
-        localStorage.clear();
-      } catch (signOutError) {
-        console.error("Critical error during logout:", signOutError);
-      }
-    } finally {
-      setLogoutLoading(false);
-    }
-  }, [user]);
-  // ---------------- HANDLE TAB CLOSE/REFRESH ----------------
-  // Replace the existing beforeunload useEffect in your sidebar with this updated version:
-
-  useEffect(() => {
-    const handleBeforeUnload = async () => {
-      if (user?.uid) {
-        try {
-          // Update logout time in userLogs collection when tab/window closes
-          const userLogsQuery = query(
-            collection(db, "userLogs"),
-            where("uid", "==", user.uid)
-          );
-          const userLogsSnapshot = await getDocs(userLogsQuery);
-
-          if (!userLogsSnapshot.empty) {
-            const userLogDoc = userLogsSnapshot.docs[0];
-            const userLogData = userLogDoc.data();
-            const loginLogs = userLogData.loginLogs || [];
-
-            if (loginLogs.length > 0) {
-              // Find the most recent login entry with null logout
-              const updatedLogs = [...loginLogs];
-              const lastActiveIndex = updatedLogs.findIndex(
-                (log) => log.lastLogout === null
-              );
-
-              if (lastActiveIndex !== -1) {
-                // Update the logout time for the active session
-                updatedLogs[lastActiveIndex] = {
-                  ...updatedLogs[lastActiveIndex],
-                  lastLogout: new Date().toISOString(),
-                };
-
-                // Update the userLogs document
-                await updateDoc(userLogDoc.ref, {
-                  loginLogs: updatedLogs,
-                  updatedAt: new Date(),
-                });
-
-                // Also update admin collection
-                const adminQuery = query(
-                  collection(db, "admin"),
-                  where("uid", "==", user.uid)
-                );
-                const adminSnapshot = await getDocs(adminQuery);
-
-                if (!adminSnapshot.empty) {
-                  const adminDoc = adminSnapshot.docs[0];
-                  await updateDoc(adminDoc.ref, {
-                    lastLogout: new Date(),
-                  });
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.error("Error updating logout on beforeunload:", error);
-        }
-      }
-    };
-
-    // For modern browsers - use beforeunload with async handling
-    const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
-      if (user?.uid) {
-        // Use sendBeacon for reliable data transmission during page unload
-        const logoutData = {
-          uid: user.uid,
-          timestamp: new Date().toISOString(),
-          action: "logout_beforeunload",
-        };
-
-        // Send beacon to your API endpoint that handles the logout logic
-        const blob = new Blob([JSON.stringify(logoutData)], {
-          type: "application/json",
-        });
-
-        // You'll need to create this API endpoint
-        navigator.sendBeacon("/api/logout-beacon", blob);
-      }
-    };
-
-    // For older browsers or fallback
-    const unloadHandler = () => {
-      if (user?.uid) {
-        handleBeforeUnload();
-      }
-    };
-
-    window.addEventListener("beforeunload", beforeUnloadHandler);
-    window.addEventListener("unload", unloadHandler);
-
-    return () => {
-      window.removeEventListener("beforeunload", beforeUnloadHandler);
-      window.removeEventListener("unload", unloadHandler);
-    };
-  }, [user]);
-  // Check if route is active
-  const isActive = useCallback(
-    (href: string | undefined) => {
-      if (!href || !pathname) return false;
-
-      if (href === "/admin") {
-        return pathname === href;
-      }
-      return pathname.startsWith(href);
-    },
-    [pathname]
+  // Memoized filtered navigation items
+  const filteredNavigationItems = useMemo(
+    () => getFilteredNavigationItems(userData.adminRole),
+    [userData.adminRole]
   );
 
-  // Enhanced role badge styling
-  const getRoleBadgeStyle = (adminRole: string | null) => {
-    switch (adminRole) {
+  // Memoized role badge style
+  const roleBadgeStyle = useMemo(() => {
+    switch (userData.adminRole) {
       case "superAdmin":
         return "bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg";
       case "admin":
@@ -586,11 +332,11 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
       default:
         return "bg-gray-200 text-gray-700";
     }
-  };
+  }, [userData.adminRole]);
 
-  // Enhanced role display names
-  const getRoleDisplayName = (adminRole: string | null) => {
-    switch (adminRole) {
+  // Memoized role display name
+  const roleDisplayName = useMemo(() => {
+    switch (userData.adminRole) {
       case "superAdmin":
         return "Super Admin";
       case "admin":
@@ -604,12 +350,228 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
       case "contentManager":
         return "Content Manager";
       default:
-        return adminRole;
+        return userData.adminRole;
     }
-  };
+  }, [userData.adminRole]);
 
-  // Profile section renderer
-  const renderProfileSection = () => {
+  // Optimized isActive check with useMemo
+  const isActive = useCallback(
+    (href: string | undefined) => {
+      if (!href || !pathname) return false;
+      if (href === "/admin") return pathname === href;
+      return pathname.startsWith(href);
+    },
+    [pathname]
+  );
+
+  // Handle mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Optimized user data listener with cleanup
+  useEffect(() => {
+    if (!user || loading) {
+      setUserDataLoading(false);
+      return;
+    }
+
+    let unsubscribe: Unsubscribe;
+    setUserDataLoading(true);
+
+    const setupListener = async () => {
+      try {
+        const adminQuery = query(
+          collection(db, "admin"),
+          where("email", "==", user.email)
+        );
+
+        unsubscribe = onSnapshot(adminQuery, {
+          next: (querySnapshot) => {
+            if (!querySnapshot.empty) {
+              const adminDoc = querySnapshot.docs[0];
+              const adminData = adminDoc.data();
+
+              const newUserData: UserData = {
+                username: adminData.username || null,
+                adminRole: adminData.adminRole || null,
+                profileImageUrl: adminData.profileImageUrl || null,
+              };
+
+              // Only update if data actually changed
+              setUserData((prevData) => {
+                if (
+                  prevData.username !== newUserData.username ||
+                  prevData.adminRole !== newUserData.adminRole ||
+                  prevData.profileImageUrl !== newUserData.profileImageUrl
+                ) {
+                  return newUserData;
+                }
+                return prevData;
+              });
+
+              setImageError(false);
+
+              // Update localStorage only if needed
+              if (adminData.adminRole) {
+                const currentRole = localStorage.getItem("adminRole");
+                if (currentRole !== adminData.adminRole) {
+                  localStorage.setItem("adminRole", adminData.adminRole);
+                }
+              }
+            } else {
+              setUserData({
+                username: null,
+                adminRole: null,
+                profileImageUrl: null,
+              });
+              localStorage.removeItem("adminRole");
+            }
+            setUserDataLoading(false);
+          },
+          error: (error) => {
+            console.error("Error in admin data listener:", error);
+            setUserData({
+              username: null,
+              adminRole: null,
+              profileImageUrl: null,
+            });
+            setUserDataLoading(false);
+            localStorage.removeItem("adminRole");
+          },
+        });
+      } catch (error) {
+        console.error("Error setting up admin data listener:", error);
+        setUserDataLoading(false);
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [user, loading]);
+
+  // Optimized logout function with better error handling
+  const handleLogout = useCallback(async () => {
+    if (logoutLoading) return; // Prevent multiple calls
+
+    setLogoutLoading(true);
+    try {
+      if (user) {
+        // Create a batch of promises for better performance
+        const logoutPromises: Promise<void>[] = [];
+
+        // Update userLogs
+        const updateUserLogs = async () => {
+          const userLogsQuery = query(
+            collection(db, "userLogs"),
+            where("uid", "==", user.uid)
+          );
+          const userLogsSnapshot = await getDocs(userLogsQuery);
+
+          if (!userLogsSnapshot.empty) {
+            const userLogDoc = userLogsSnapshot.docs[0];
+            const userLogData = userLogDoc.data();
+            const loginLogs = userLogData.loginLogs || [];
+
+            if (loginLogs.length > 0) {
+              const updatedLogs = [...loginLogs];
+              const lastActiveIndex = updatedLogs.findIndex(
+                (log) => log.lastLogout === null
+              );
+
+              if (lastActiveIndex !== -1) {
+                updatedLogs[lastActiveIndex] = {
+                  ...updatedLogs[lastActiveIndex],
+                  lastLogout: new Date().toISOString(),
+                };
+
+                await updateDoc(userLogDoc.ref, {
+                  loginLogs: updatedLogs,
+                  updatedAt: new Date(),
+                });
+              }
+            }
+          }
+        };
+
+        // Update admin collection
+        const updateAdminCollection = async () => {
+          const adminQuery = query(
+            collection(db, "admin"),
+            where("uid", "==", user.uid)
+          );
+          const adminSnapshot = await getDocs(adminQuery);
+
+          if (!adminSnapshot.empty) {
+            const adminDoc = adminSnapshot.docs[0];
+            await updateDoc(adminDoc.ref, {
+              lastLogout: new Date(),
+            });
+          }
+        };
+
+        logoutPromises.push(updateUserLogs(), updateAdminCollection());
+
+        // Execute all promises concurrently
+        await Promise.allSettled(logoutPromises);
+      }
+
+      // Clear localStorage
+      localStorage.removeItem("adminRole");
+      localStorage.removeItem("adminUid");
+      localStorage.removeItem("isAuthenticated");
+
+      // Sign out from Firebase Auth
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out:", error);
+      // Still attempt to sign out even if Firestore update fails
+      try {
+        await signOut(auth);
+        localStorage.clear();
+      } catch (signOutError) {
+        console.error("Critical error during logout:", signOutError);
+      }
+    } finally {
+      setLogoutLoading(false);
+    }
+  }, [user, logoutLoading]);
+
+  // Optimized beforeunload handler
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const handleBeforeUnload = () => {
+      // Use sendBeacon for reliable data transmission
+      const logoutData = {
+        uid: user.uid,
+        timestamp: new Date().toISOString(),
+        action: "logout_beforeunload",
+      };
+
+      const blob = new Blob([JSON.stringify(logoutData)], {
+        type: "application/json",
+      });
+
+      navigator.sendBeacon("/api/logout-beacon", blob);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [user?.uid]);
+
+  // Optimized image error handler
+  const handleImageError = useCallback(() => {
+    setImageError(true);
+  }, []);
+
+  // Memoized profile section
+  const profileSection = useMemo(() => {
     if (!user) return null;
 
     return (
@@ -624,14 +586,14 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
               <div className="w-16 h-16 rounded-full bg-gray-200 animate-pulse flex items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
               </div>
-            ) : profileImage && !imageError ? (
+            ) : userData.profileImageUrl && !imageError ? (
               <div className="w-16 h-16 rounded-full overflow-hidden relative border-3 border-primary/20 shadow-lg group-hover:border-primary/40 transition-all duration-300">
                 <Image
-                  src={profileImage}
+                  src={userData.profileImageUrl}
                   alt="Profile"
                   fill
                   sizes="64px"
-                  className="object-cover transition-transform duration-300 group-hover:scale-110 "
+                  className="object-cover transition-transform duration-300 group-hover:scale-110"
                   onError={handleImageError}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -643,7 +605,6 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
               </div>
             )}
 
-            {/* Online status indicator */}
             <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-2 border-white rounded-full shadow-sm animate-pulse" />
           </div>
 
@@ -656,15 +617,13 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
             ) : (
               <>
                 <p className="font-semibold text-sm text-gray-900 group-hover:text-primary transition-colors duration-300">
-                  {username || "No username"}
+                  {userData.username || "No username"}
                 </p>
-                {adminRole && (
+                {userData.adminRole && (
                   <p
-                    className={`text-xs mt-1 px-3 py-1 rounded-full font-medium ${getRoleBadgeStyle(
-                      adminRole
-                    )}`}
+                    className={`text-xs mt-1 px-3 py-1 rounded-full font-medium ${roleBadgeStyle}`}
                   >
-                    {getRoleDisplayName(adminRole)}
+                    {roleDisplayName}
                   </p>
                 )}
               </>
@@ -715,21 +674,24 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
         </AlertDialog>
       </div>
     );
-  };
+  }, [
+    user,
+    userDataLoading,
+    userData,
+    imageError,
+    roleBadgeStyle,
+    roleDisplayName,
+    logoutLoading,
+    handleImageError,
+    handleLogout,
+  ]);
 
   // Don't render until mounted
-  if (!mounted) {
-    return <SidebarSkeleton />;
-  }
-
-  // Show loading state
-  if (loading) {
-    return <SidebarSkeleton />;
-  }
+  if (!mounted) return <SidebarSkeleton />;
+  if (loading) return <SidebarSkeleton />;
 
   // Show error state
   if (error) {
-    console.error("Auth error:", error);
     return (
       <div className="w-64 bg-red-50 border-r flex flex-col h-screen sticky top-0 shadow-xl">
         <div className="flex-1 flex items-center justify-center">
@@ -754,12 +716,8 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
               width={150}
               height={30}
               sizes="150px"
-              className="transform hover:scale-105 transition-all duration-300 drop-shadow-sm"
               priority={true}
               quality={75}
-              placeholder="blur"
-              blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk蝄縛=="
-              onError={() => console.warn("Logo failed to load")}
             />
             <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg blur-xl -z-10" />
           </div>
@@ -768,42 +726,27 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
         {/* Navigation Section */}
         <nav className={sidebarStyles.nav}>
           <div className="flex flex-col gap-1">
-            {getFilteredNavigationItems(adminRole).map((item) => {
-              // Regular navigation items
-              const itemIsActive = isActive(item.href);
-
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href || "#"}
-                  className={cn(
-                    sidebarStyles.navItem,
-                    itemIsActive
-                      ? sidebarStyles.activeNavItem
-                      : sidebarStyles.inactiveNavItem
-                  )}
-                  aria-label={item.description}
-                >
-                  <item.icon className={cn(sidebarStyles.icon, "mr-3")} />
-                  <span className="font-medium">{item.name}</span>
-                  {itemIsActive && (
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-l-full shadow-sm" />
-                  )}
-                </Link>
-              );
-            })}
+            {filteredNavigationItems.map((item) => (
+              <NavigationItem
+                key={item.name}
+                item={item}
+                isActive={isActive(item.href)}
+              />
+            ))}
           </div>
         </nav>
 
         {/* Profile Section */}
-        {renderProfileSection()}
+        {profileSection}
       </div>
 
       {/* Decorative gradient overlay */}
       <div className="absolute top-0 left-0 w-full h-screen bg-gradient-to-b from-transparent via-transparent to-gray-50/20 pointer-events-none" />
     </div>
   );
-};
+});
+
+ClientSidebar.displayName = "ClientSidebar";
 
 // Dynamic import with proper error handling
 const Sidebar = dynamic(() => Promise.resolve(ClientSidebar), {

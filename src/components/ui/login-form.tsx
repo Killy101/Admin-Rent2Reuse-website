@@ -176,7 +176,6 @@ export function LoginForm({
                   alt="Login Image"
                   width={200}
                   height={380}
-                  className="object-cover dark:brightness-[0.2] dark:grayscale"
                 />
                 <h1 className="text-2xl text-primary font-bold">Welcome</h1>
                 <p className="text-muted-foreground text-balance">
@@ -220,12 +219,15 @@ export function LoginForm({
             </div>
           </form>
 
-          <div className="flex justify-center items-center bg-gradient-to-r from-primary to-secondary hidden md:flex">
+          <div className="flex justify-center items-center bg-gradient-to-r from-primary to-secondary  md:flex">
             <Image
               src="/assets/loginCard.png"
-              alt="Login Image"
+              alt="Login card"
               width={300}
-              height={300}
+              height={347}
+              sizes="(max-width: 600px) 100vw, 300px"
+              quality={60}
+              priority
               className="object-cover dark:brightness-[0.2] dark:grayscale"
             />
           </div>
