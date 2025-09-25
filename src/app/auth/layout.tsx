@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     setIsClient(true);
   }, []);
-  if (!user) return null;
+(!user) return null;
 
   return (
     <div className="flex min-h-screen bg-white text-gray-900">
