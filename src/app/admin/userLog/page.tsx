@@ -47,6 +47,8 @@ const UserLogsPage = () => {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   const itemsPerPage = 10;
 
@@ -83,7 +85,7 @@ const UserLogsPage = () => {
     }
   };
 
-  // Fetch user logs from Firebase (unchanged logic for reading + date conversions)
+  // Fetch user logs from Firebase
   useEffect(() => {
     const fetchLogs = async () => {
       try {
@@ -220,7 +222,7 @@ const UserLogsPage = () => {
     });
   });
 
-  // Apply search, role, status filter and sort
+  // Apply search, role, status, and date range filter and sort
   const filteredSortedSessions = (() => {
     const term = searchTerm.trim().toLowerCase();
 
@@ -230,12 +232,34 @@ const UserLogsPage = () => {
         s.email.toLowerCase().includes(term) ||
         s.adminRole.toLowerCase().includes(term) ||
         s.uid.toLowerCase().includes(term);
+
       const matchesRole = roleFilter === "all" || s.adminRole === roleFilter;
+
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "online" && s.isOnline) ||
         (statusFilter === "offline" && !s.isOnline);
-      return matchesSearch && matchesRole && matchesStatus;
+
+      // Date range filtering - check if login date is within range
+      let matchesDateRange = true;
+      if (startDate || endDate) {
+        const loginDate = s.lastLogin;
+        if (loginDate) {
+          const logDate = new Date(loginDate);
+          const isAfterStart = startDate
+            ? logDate >= new Date(startDate)
+            : true;
+          const isBeforeEnd = endDate
+            ? logDate <= new Date(endDate + "T23:59:59")
+            : true;
+          matchesDateRange = isAfterStart && isBeforeEnd;
+        } else {
+          // If no login date and date filter is applied, exclude this entry
+          matchesDateRange = !startDate && !endDate;
+        }
+      }
+
+      return matchesSearch && matchesRole && matchesStatus && matchesDateRange;
     });
 
     // Sort: online first, then offline by most recent activity (desc)
@@ -325,10 +349,16 @@ const UserLogsPage = () => {
   const onlineUsers = uniqueUserOnlineCount;
   const offlineUsers = Math.max(0, uniqueUsers.length - onlineUsers);
 
+  // Clear date filter function
+  const clearDateFilter = () => {
+    setStartDate("");
+    setEndDate("");
+  };
+
   // Reset page when filters/search change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, roleFilter, statusFilter]);
+  }, [searchTerm, roleFilter, statusFilter, startDate, endDate]);
 
   if (loading) {
     return (
@@ -482,7 +512,39 @@ const UserLogsPage = () => {
             </div>
           </div>
 
-          {/* User Status Stats */}
+          {/* Date Range Filter */}
+          <div className="flex flex-wrap items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-600">
+                From:
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-600">To:</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            {(startDate || endDate) && (
+              <button
+                onClick={clearDateFilter}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Clear Date Filter
+              </button>
+            )}
+          </div>
+
+          {/* User Status Stats
           <div className="grid grid-cols-3 gap-6 text-center">
             <div>
               <div className="text-2xl font-bold text-green-600">
@@ -498,11 +560,11 @@ const UserLogsPage = () => {
             </div>
             <div>
               <div className="text-2xl font-bold text-blue-600">
-                {sessionRows.length}
+                {filteredSortedSessions.length}
               </div>
-              <div className="text-slate-500">Total Logs</div>
+              <div className="text-slate-500">Filtered Logs</div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Table */}

@@ -153,6 +153,7 @@ const roleAccess: {
     "/admin/announcements",
     "/admin/subscription/subscriptionsList",
     "/admin/profile",
+    "/admin/userLog",
   ],
   manageUsers: [
     "/admin",
@@ -161,6 +162,7 @@ const roleAccess: {
     "/admin/transaction",
     "/admin/subscription",
     "/admin/profile",
+    "/admin/userLog",
   ],
   // New role suggestions
   financialViewer: [
