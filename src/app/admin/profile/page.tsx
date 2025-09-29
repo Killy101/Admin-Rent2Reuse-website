@@ -103,7 +103,7 @@ const createInitialAdminDocument = async (user: User) => {
     console.log("✅ Initial admin document created successfully");
     return initialData;
   } catch (error) {
-    console.error("❌ Error creating initial admin document:", error);
+    console.log("❌ Error creating initial admin document:", error);
     throw error;
   }
 };
@@ -272,7 +272,7 @@ export default function ProfilePage() {
 
           console.log("✅ Admin data loaded successfully");
         } catch (error) {
-          console.error("❌ Failed to fetch/create admin data:", error);
+          console.log("❌ Failed to fetch/create admin data:", error);
           showError(
             "Failed to load profile data. Please check your connection and try again."
           );
@@ -464,7 +464,7 @@ export default function ProfilePage() {
           console.log("✅ Image uploaded successfully");
           setUploadProgress(90);
         } catch (uploadError) {
-          console.error("❌ Image upload failed:", uploadError);
+          console.log("❌ Image upload failed:", uploadError);
           throw new Error("Failed to upload image. Please try again.");
         }
       }
@@ -515,7 +515,7 @@ export default function ProfilePage() {
       setProfileImage(null);
       console.log("✅ Profile update completed successfully");
     } catch (error: any) {
-      console.error("❌ Profile update failed:", error);
+      console.log("❌ Profile update failed:", error);
       showError(error.message || "Failed to update profile. Please try again.");
     } finally {
       setLoading(false);
@@ -664,7 +664,7 @@ export default function ProfilePage() {
                       }
                       return format(date, "MMM dd, yyyy");
                     } catch (error) {
-                      console.error("Date formatting error:", error);
+                      console.log("Date formatting error:", error);
                       return "Invalid date";
                     }
                   })()}

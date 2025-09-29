@@ -79,7 +79,7 @@ export async function createTransaction(
 
     return docRef.id;
   } catch (error) {
-    console.error("Error creating transaction:", error);
+    console.log("Error creating transaction:", error);
     throw error;
   }
 }

@@ -80,7 +80,7 @@ const UserLogsPage = () => {
 
       return "user";
     } catch (error) {
-      console.error("Error fetching admin role:", error);
+      console.log("Error fetching admin role:", error);
       return "user";
     }
   };
@@ -168,7 +168,7 @@ const UserLogsPage = () => {
             ? (err as { message: string }).message
             : String(err);
         setError("Failed to fetch user logs: " + errorMsg);
-        console.error("Error fetching logs:", err);
+        console.log("Error fetching logs:", err);
       } finally {
         setLoading(false);
       }
@@ -301,7 +301,7 @@ const UserLogsPage = () => {
         hour12: true,
       });
     } catch (error) {
-      console.error("Error formatting date:", error);
+      console.log("Error formatting date:", error);
       return "Invalid Date";
     }
   };

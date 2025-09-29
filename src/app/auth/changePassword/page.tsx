@@ -264,7 +264,7 @@ export default function ChangePasswordPage() {
         }
       }, 2000);
     } catch (error: any) {
-      console.error("Password change error:", error);
+      console.log("Password change error:", error);
 
       // Handle different error types
       switch (error.code) {

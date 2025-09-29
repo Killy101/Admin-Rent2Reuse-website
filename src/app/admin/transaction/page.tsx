@@ -83,7 +83,7 @@ const formatDate = (timestamp: Timestamp | null | undefined): string => {
     if (!timestamp || !isValidTimestamp(timestamp)) return "N/A";
     return format(timestamp.toDate(), "MMM dd, yyyy");
   } catch (error) {
-    console.error("Error formatting date:", error);
+    console.log("Error formatting date:", error);
     return "Invalid Date";
   }
 };
@@ -125,7 +125,7 @@ const isValidTimestamp = (timestamp: any): timestamp is Timestamp => {
       typeof timestamp.toDate === "function"
     );
   } catch (error) {
-    console.error("Invalid timestamp:", error);
+    console.log("Invalid timestamp:", error);
     return false;
   }
 };
@@ -241,7 +241,7 @@ export default function AdminTransactionsPage() {
   //       const role = adminDoc.data().role;
   //       setUserRole(role);
   //     } catch (error) {
-  //       console.error("Error checking permissions:", error);
+  //       console.log("Error checking permissions:", error);
   //       setUserRole(null);
   //     } finally {
   //       setAuthLoading(false);
@@ -273,7 +273,7 @@ export default function AdminTransactionsPage() {
                   subscriptionData = subscriptionDoc.data();
                 }
               } catch (error) {
-                console.error("Error fetching subscription:", error);
+                console.log("Error fetching subscription:", error);
               }
             }
 
@@ -296,7 +296,7 @@ export default function AdminTransactionsPage() {
 
         setTransactions(data);
       } catch (error) {
-        console.error("Error fetching transactions:", error);
+        console.log("Error fetching transactions:", error);
         setError("Failed to fetch transactions. Please try again.");
       } finally {
         setLoading(false);
@@ -1155,10 +1155,13 @@ export default function AdminTransactionsPage() {
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-end" style={{alignItems: "center", justifyContent: "center" }}>
+                    <div
+                      className="flex justify-between items-end"
+                      style={{ alignItems: "center", justifyContent: "center" }}
+                    >
                       {/* <p className="text-xs text-gray-500">
                         Generated on {format(new Date(), "PPpp")}
-                      </p> */}  
+                      </p> */}
                       <div className="flex space-x-3">
                         <Button
                           onClick={() => window.print()}

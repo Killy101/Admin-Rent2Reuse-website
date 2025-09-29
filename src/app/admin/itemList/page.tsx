@@ -126,7 +126,7 @@ const ItemListPage: React.FC = () => {
         setAvailableCategories(Array.from(categories));
         setLoading(false);
       } catch (error) {
-        console.error("Error fetching items:", error);
+        console.log("Error fetching items:", error);
         setLoading(false);
       }
     };

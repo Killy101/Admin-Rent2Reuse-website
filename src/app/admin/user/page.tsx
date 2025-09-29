@@ -174,15 +174,12 @@ export default function UsersPage() {
                         endDateTime > now ? "Active" : "Expired";
                     }
                   } catch (error) {
-                    console.error(
-                      "Error processing subscription dates:",
-                      error
-                    );
+                    console.log("Error processing subscription dates:", error);
                     currentPlan.status = "Inactive";
                   }
                 }
               } catch (subError) {
-                console.error("Error fetching subscription:", subError);
+                console.log("Error fetching subscription:", subError);
               }
             }
 
@@ -212,7 +209,7 @@ export default function UsersPage() {
               joinedDate: data.joinedDate || "",
             });
           } catch (userError) {
-            console.error("Error processing user:", userError);
+            console.log("Error processing user:", userError);
           }
         }
 
@@ -220,7 +217,7 @@ export default function UsersPage() {
         setSubscriptionDates(datesMap);
         setPlanStats(stats);
       } catch (error) {
-        console.error("Error fetching users:", error);
+        console.log("Error fetching users:", error);
       } finally {
         setLoading(false);
       }
@@ -252,7 +249,7 @@ export default function UsersPage() {
   //       const role = adminDoc.data().role;
   //       setUserRole(role);
   //     } catch (error) {
-  //       console.error("Error checking permissions:", error);
+  //       console.log("Error checking permissions:", error);
   //       setUserRole(null);
   //     } finally {
   //       setAuthLoading(false);
@@ -333,7 +330,7 @@ export default function UsersPage() {
           matchesSearch && matchesStatus && matchesPlan && matchesVerification
         );
       } catch (error) {
-        console.error("Error filtering user:", error);
+        console.log("Error filtering user:", error);
         return false;
       }
     });
@@ -381,7 +378,7 @@ export default function UsersPage() {
 
       return "Invalid date";
     } catch (error) {
-      console.error("Error formatting date:", error);
+      console.log("Error formatting date:", error);
       return "Invalid date";
     }
   };

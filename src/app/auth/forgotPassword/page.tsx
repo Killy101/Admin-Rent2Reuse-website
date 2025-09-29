@@ -95,7 +95,7 @@ export default function ForgotPasswordPage() {
       localStorage.setItem("resetPasswordCooldown", cooldownEndTime.toString());
       setTimeRemaining(60);
     } catch (error: any) {
-      console.error("Password reset error:", error);
+      console.log("Password reset error:", error);
       switch (error.code) {
         case "auth/user-not-found":
           setMessage("No account found with this email address.");

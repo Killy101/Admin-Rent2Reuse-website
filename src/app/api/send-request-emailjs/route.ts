@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     // Validate required fields
     if (!to_email || !to_name || !user_role || !request_status) {
-      console.error("❌ Missing required fields:", {
+      console.log("❌ Missing required fields:", {
         to_email: !!to_email,
         to_name: !!to_name,
         user_role: !!user_role,
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(to_email)) {
-      console.error("❌ Invalid email format:", to_email);
+      console.log("❌ Invalid email format:", to_email);
       return NextResponse.json(
         { error: "Invalid email format", email: to_email },
         { status: 400 }
@@ -128,8 +128,8 @@ export async function POST(request: Request) {
       messageId: result.status,
     });
   } catch (error: any) {
-    console.error("❌ Email sending failed:", error);
-    console.error("Error details:", {
+    console.log("❌ Email sending failed:", error);
+    console.log("Error details:", {
       message: error.message,
       status: error.status,
       text: error.text,

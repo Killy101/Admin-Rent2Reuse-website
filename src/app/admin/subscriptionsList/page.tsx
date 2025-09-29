@@ -196,7 +196,7 @@ export default function SubscriptionsPage() {
                 }
               }
             } catch (subError) {
-              console.error("Error fetching subscription:", subError);
+              console.log("Error fetching subscription:", subError);
             }
           }
 
@@ -215,7 +215,7 @@ export default function SubscriptionsPage() {
       setSubscriptionDates(datesMap);
       setUsers(userData.filter((user) => user.role === "user"));
     } catch (error) {
-      console.error("Error fetching users:", error);
+      console.log("Error fetching users:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -306,7 +306,7 @@ export default function SubscriptionsPage() {
                 }
               }
             } catch (subError) {
-              console.error("❌ Error fetching subscription:", subError);
+              console.log("❌ Error fetching subscription:", subError);
             }
           }
 
@@ -329,7 +329,7 @@ export default function SubscriptionsPage() {
       console.log("✅ Data refresh completed successfully");
       showSuccess("Data refreshed successfully!");
     } catch (error) {
-      console.error("❌ Error refreshing data:", error);
+      console.log("❌ Error refreshing data:", error);
       showError("Failed to refresh data. Please try again.");
     } finally {
       setRefreshing(false);
@@ -457,7 +457,7 @@ export default function SubscriptionsPage() {
         day: "numeric",
       });
     } catch (error) {
-      console.error("Error formatting date:", error);
+      console.log("Error formatting date:", error);
       return "N/A";
     }
   };
@@ -498,7 +498,7 @@ export default function SubscriptionsPage() {
         hasIndicator: false,
       };
     } catch (error) {
-      console.error("Error formatting status:", error);
+      console.log("Error formatting status:", error);
       return {
         text: "Inactive",
         className: "bg-gray-50 text-gray-700 border border-gray-200",

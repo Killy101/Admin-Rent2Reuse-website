@@ -95,6 +95,7 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
   }, 500);
 
   // Function to create or update user logs
+  // Function to create or update user logs
   const createOrUpdateUserLog = async (uid: string, email: string) => {
     try {
       const now = new Date();
@@ -124,11 +125,27 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
       } else {
         // Update existing userLogs document
         const userLogDoc = userLogsSnapshot.docs[0];
+        const userLogData = userLogDoc.data();
+        const loginLogs = userLogData.loginLogs || [];
+
+        // ✅ Check for active session
+        const activeIndex = loginLogs.findIndex(
+          (log: any) => log.lastLogout === null
+        );
+
+        if (activeIndex !== -1) {
+          // Update the existing active session
+          loginLogs[activeIndex].lastLogin = now.toISOString();
+        } else {
+          // Add a new session
+          loginLogs.push(newLogEntry);
+        }
+
         await updateDoc(userLogDoc.ref, {
-          loginLogs: arrayUnion(newLogEntry),
+          loginLogs,
           updatedAt: now,
         });
-        console.log("Updated existing userLogs document");
+        console.log("Updated existing userLogs document (no duplicates)");
       }
 
       // Also update the admin collection with just the lastLogin timestamp
@@ -145,7 +162,7 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
         });
       }
     } catch (error) {
-      console.error("Error creating/updating user log:", error);
+      console.log("Error creating/updating user log:", error);
       throw error;
     }
   };
@@ -198,7 +215,7 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
           router.replace("/admin");
         }
       } catch (error) {
-        console.error("Error in auth state change:", error);
+        console.log("Error in auth state change:", error);
         if (mounted) {
           setError("Error verifying account. Please try again.");
           await auth.signOut();
@@ -251,7 +268,7 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
         lastLogin: new Date().toISOString(),
       };
     } catch (error) {
-      console.error("Error validating admin account:", error);
+      console.log("Error validating admin account:", error);
       throw error;
     }
   };
@@ -285,7 +302,7 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
       const adminData = adminSnapshot.docs[0].data();
       return { exists: true, adminData };
     } catch (error) {
-      console.error("Error checking admin existence:", error);
+      console.log("Error checking admin existence:", error);
       return { exists: false };
     }
   };
@@ -343,7 +360,7 @@ export default function SignInPage({ className }: React.ComponentProps<"div">) {
       // The auth state change listener will handle the redirect
       // So we don't need to manually redirect here
     } catch (authError: any) {
-      console.error("Authentication error:", authError);
+      // console.log("Authentication error:", authError);
       setLoginAttempts((prev) => prev + 1);
 
       // Handle specific Firebase auth errors

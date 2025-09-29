@@ -347,7 +347,7 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
           setUserDataLoading(false);
         },
         error: (error) => {
-          console.error("â Error in admin data listener:", error);
+          console.log("â Error in admin data listener:", error);
           setUsername(null);
           setAdminRole(null);
           setProfileImage(null);
@@ -362,7 +362,7 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
         unsubscribe();
       };
     } catch (error) {
-      console.error("â Error setting up admin data listener:", error);
+      console.log("â Error setting up admin data listener:", error);
       setUserDataLoading(false);
     }
   }, [user, loading]);
@@ -395,35 +395,27 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
           const loginLogs = userLogData.loginLogs || [];
 
           if (loginLogs.length > 0) {
-            // Find the most recent login entry with null logout
-            const updatedLogs = [...loginLogs];
-            const lastActiveIndex = updatedLogs.findIndex(
-              (log) => log.lastLogout === null
+            // ✅ Update ALL active sessions with null logout
+            const updatedLogs = loginLogs.map((log: any) =>
+              log.lastLogout === null
+                ? { ...log, lastLogout: new Date().toISOString() }
+                : log
             );
 
-            if (lastActiveIndex !== -1) {
-              // Update the logout time for the active session
-              updatedLogs[lastActiveIndex] = {
-                ...updatedLogs[lastActiveIndex],
-                lastLogout: new Date().toISOString(),
-              };
+            await updateDoc(userLogDoc.ref, {
+              loginLogs: updatedLogs,
+              updatedAt: new Date(),
+            });
 
-              // Update the userLogs document
-              await updateDoc(userLogDoc.ref, {
-                loginLogs: updatedLogs,
-                updatedAt: new Date(),
-              });
-
-              console.log("Successfully updated logout time in userLogs");
-            } else {
-              console.warn("No active session found to logout");
-            }
+            console.log(
+              "✅ Successfully updated ALL active sessions to logout"
+            );
           }
         } else {
-          console.warn("No userLogs document found for user:", user.uid);
+          console.warn("⚠️ No userLogs document found for user:", user.uid);
         }
 
-        // Also update admin collection with lastLogout (for backward compatibility)
+        // Also update admin collection with lastLogout
         const adminQuery = query(
           collection(db, "admin"),
           where("uid", "==", user.uid)
@@ -447,28 +439,27 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
       // Sign out from Firebase Auth
       await signOut(auth);
 
-      console.log("Sidebar logout completed successfully");
+      console.log("✅ Sidebar logout completed successfully");
     } catch (error) {
-      console.error("Error signing out:", error);
-      // Still attempt to sign out even if Firestore update fails
+      console.log("❌ Error signing out:", error);
       try {
         await signOut(auth);
         localStorage.clear();
       } catch (signOutError) {
-        console.error("Critical error during logout:", signOutError);
+        console.log("Critical error during logout:", signOutError);
       }
     } finally {
       setLogoutLoading(false);
     }
   }, [user]);
+
   // ---------------- HANDLE TAB CLOSE/REFRESH ----------------
   // Replace the existing beforeunload useEffect in your sidebar with this updated version:
 
   useEffect(() => {
-    const handleBeforeUnload = async () => {
+    const handleBeforeUnloadUpdate = async () => {
       if (user?.uid) {
         try {
-          // Update logout time in userLogs collection when tab/window closes
           const userLogsQuery = query(
             collection(db, "userLogs"),
             where("uid", "==", user.uid)
@@ -481,71 +472,60 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
             const loginLogs = userLogData.loginLogs || [];
 
             if (loginLogs.length > 0) {
-              // Find the most recent login entry with null logout
-              const updatedLogs = [...loginLogs];
-              const lastActiveIndex = updatedLogs.findIndex(
-                (log) => log.lastLogout === null
+              // ✅ Update ALL active sessions with null logout
+              const updatedLogs = loginLogs.map((log: any) =>
+                log.lastLogout === null
+                  ? { ...log, lastLogout: new Date().toISOString() }
+                  : log
               );
 
-              if (lastActiveIndex !== -1) {
-                // Update the logout time for the active session
-                updatedLogs[lastActiveIndex] = {
-                  ...updatedLogs[lastActiveIndex],
-                  lastLogout: new Date().toISOString(),
-                };
+              await updateDoc(userLogDoc.ref, {
+                loginLogs: updatedLogs,
+                updatedAt: new Date(),
+              });
 
-                // Update the userLogs document
-                await updateDoc(userLogDoc.ref, {
-                  loginLogs: updatedLogs,
-                  updatedAt: new Date(),
+              // Also update admin collection for consistency
+              const adminQuery = query(
+                collection(db, "admin"),
+                where("uid", "==", user.uid)
+              );
+              const adminSnapshot = await getDocs(adminQuery);
+
+              if (!adminSnapshot.empty) {
+                const adminDoc = adminSnapshot.docs[0];
+                await updateDoc(adminDoc.ref, {
+                  lastLogout: new Date(),
                 });
-
-                // Also update admin collection
-                const adminQuery = query(
-                  collection(db, "admin"),
-                  where("uid", "==", user.uid)
-                );
-                const adminSnapshot = await getDocs(adminQuery);
-
-                if (!adminSnapshot.empty) {
-                  const adminDoc = adminSnapshot.docs[0];
-                  await updateDoc(adminDoc.ref, {
-                    lastLogout: new Date(),
-                  });
-                }
               }
             }
           }
         } catch (error) {
-          console.error("Error updating logout on beforeunload:", error);
+          console.log("❌ Error updating logout on beforeunload:", error);
         }
       }
     };
 
-    // For modern browsers - use beforeunload with async handling
     const beforeUnloadHandler = (event: BeforeUnloadEvent) => {
       if (user?.uid) {
-        // Use sendBeacon for reliable data transmission during page unload
+        // Use sendBeacon for reliability
         const logoutData = {
           uid: user.uid,
           timestamp: new Date().toISOString(),
           action: "logout_beforeunload",
         };
 
-        // Send beacon to your API endpoint that handles the logout logic
         const blob = new Blob([JSON.stringify(logoutData)], {
           type: "application/json",
         });
 
-        // You'll need to create this API endpoint
         navigator.sendBeacon("/api/logout-beacon", blob);
       }
     };
 
-    // For older browsers or fallback
+    // Fallback for browsers not supporting sendBeacon
     const unloadHandler = () => {
       if (user?.uid) {
-        handleBeforeUnload();
+        handleBeforeUnloadUpdate();
       }
     };
 
@@ -557,6 +537,7 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
       window.removeEventListener("unload", unloadHandler);
     };
   }, [user]);
+
   // Check if route is active
   const isActive = useCallback(
     (href: string | undefined) => {
@@ -731,7 +712,7 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
 
   // Show error state
   if (error) {
-    console.error("Auth error:", error);
+    console.log("Auth error:", error);
     return (
       <div className="w-64 bg-red-50 border-r flex flex-col h-screen sticky top-0 shadow-xl">
         <div className="flex-1 flex items-center justify-center">

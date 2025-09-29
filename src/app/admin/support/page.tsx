@@ -204,7 +204,7 @@ const AdminSupportPage = () => {
           console.log(`Updated ${updatePromises.length} tickets with ticketId`);
         }
       } catch (error) {
-        console.error("Error fetching tickets:", error);
+        console.log("Error fetching tickets:", error);
         toast.error("Failed to load support tickets");
       }
     };
@@ -256,7 +256,7 @@ const AdminSupportPage = () => {
         throw new Error(`Email send failed with status: ${response.status}`);
       }
     } catch (error) {
-      console.error("EmailJS Error:", error);
+      console.log("EmailJS Error:", error);
       toast.error("Failed to send email notification");
       throw error;
     }
@@ -285,7 +285,7 @@ const AdminSupportPage = () => {
       console.log("In-app notification sent to user:", userId);
       return true;
     } catch (error) {
-      console.error("Error sending notification:", error);
+      console.log("Error sending notification:", error);
       throw error;
     }
   };
@@ -376,7 +376,7 @@ const AdminSupportPage = () => {
       setSelectedTicket(null);
       setStatusUpdate("");
     } catch (error) {
-      console.error("Error sending reply:", error);
+      console.log("Error sending reply:", error);
       toast.error("Failed to send reply. Please try again.");
     } finally {
       setIsLoading(false);
@@ -400,7 +400,7 @@ const AdminSupportPage = () => {
       );
       toast.success(`Status updated to ${newStatus}`);
     } catch (error) {
-      console.error("Error updating status:", error);
+      console.log("Error updating status:", error);
       toast.error("Failed to update status");
     }
   };
@@ -554,7 +554,7 @@ const AdminSupportPage = () => {
       // Update unread count
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
-      console.error("Error marking ticket as read:", error);
+      console.log("Error marking ticket as read:", error);
       toast.error("Failed to mark ticket as read");
     }
   };
@@ -671,7 +671,7 @@ const AdminSupportPage = () => {
 
       toast.success("Ticket archived successfully!");
     } catch (error) {
-      console.error("Error archiving ticket:", error);
+      console.log("Error archiving ticket:", error);
       toast.error("Failed to archive ticket");
     }
   }
@@ -698,7 +698,7 @@ const AdminSupportPage = () => {
 
       toast.success("Ticket unarchived successfully!");
     } catch (error) {
-      console.error("Error unarchiving ticket:", error);
+      console.log("Error unarchiving ticket:", error);
       toast.error("Failed to unarchive ticket");
     }
   }
@@ -710,7 +710,7 @@ const AdminSupportPage = () => {
       setTickets((prev) => prev.filter((t) => t.id !== id));
       toast.success("Ticket deleted successfully!");
     } catch (error) {
-      console.error("Error deleting ticket:", error);
+      console.log("Error deleting ticket:", error);
       toast.error("Failed to delete ticket");
     }
   }

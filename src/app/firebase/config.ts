@@ -34,7 +34,7 @@ const auth = getAuth(app);
 
 // Set persistence to local (default behavior)
 setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error("Failed to set persistence:", error);
+  console.log("Failed to set persistence:", error);
 });
 
 export const db = getFirestore(app);

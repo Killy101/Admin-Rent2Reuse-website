@@ -116,7 +116,7 @@ export function LoginForm({
       // Redirect to admin dashboard
       router.push("/admin");
     } catch (error: any) {
-      console.error("Login error:", error);
+      console.log("Login error:", error);
 
       // Handle specific error cases
       switch (error.code) {
@@ -208,7 +208,7 @@ export function LoginForm({
                   id="current_password"
                   placeholder="Enter Password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e: any) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
                 />
