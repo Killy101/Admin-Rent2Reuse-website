@@ -46,8 +46,11 @@ interface UserLog {
   lastLogin: string;
   lastLogout: string | null;
 }
+interface SignInPageProps {
+  className?: string;
+}
 
-export default function SignInPage({ className }: React.ComponentProps<"div">) {
+export default function SignInPage({ className }: SignInPageProps) {
   const [loading, setLoading] = useState({
     page: true,
     auth: false,
