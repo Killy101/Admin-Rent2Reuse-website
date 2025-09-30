@@ -49,7 +49,7 @@ export function PhotoUpload({
       // Notify parent component
       onUploadComplete(downloadURL);
     } catch (error) {
-      console.error("Error uploading image:", error);
+      console.log("Error uploading image:", error);
       alert("Failed to upload image. Please try again.");
     } finally {
       setIsUploading(false);

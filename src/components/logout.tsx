@@ -88,7 +88,7 @@ const Logout = () => {
         console.log("Updated lastLogout in admin collection");
       }
     } catch (error) {
-      console.error("Error updating logout time:", error);
+      console.log("Error updating logout time:", error);
       throw error;
     }
   };
@@ -124,14 +124,14 @@ const Logout = () => {
       // Redirect to login page
       router.push("/auth/signin");
     } catch (error) {
-      console.error("Logout error:", error);
+      console.log("Logout error:", error);
       // Still sign out even if Firestore update fails
       try {
         await signOut(auth);
         localStorage.clear();
         router.push("/auth/signin");
       } catch (signOutError) {
-        console.error("Critical error during logout:", signOutError);
+        console.log("Critical error during logout:", signOutError);
       }
     } finally {
       setIsLoggingOut(false);

@@ -274,7 +274,7 @@ export default function DashboardPage() {
                 handleSubscriptionData(subData, currentPlan, datesMap);
               }
             } catch (subError) {
-              console.error("❌ Error fetching subscription:", subError);
+              console.log("❌ Error fetching subscription:", subError);
             }
           }
 
@@ -407,7 +407,7 @@ export default function DashboardPage() {
         message: "Data refreshed successfully!",
       });
     } catch (error) {
-      console.error("❌ Error refreshing data:", error);
+      console.log("❌ Error refreshing data:", error);
       setNotification({
         type: "error",
         message: "Failed to refresh data. Please try again.",
@@ -463,7 +463,7 @@ export default function DashboardPage() {
 
         setSupportTickets(tickets);
       } catch (err) {
-        console.error("Error fetching support tickets:", err);
+        console.log("Error fetching support tickets:", err);
       }
     };
 
@@ -483,7 +483,7 @@ export default function DashboardPage() {
     try {
       return timestamp.toDate();
     } catch (error) {
-      console.error("Invalid timestamp:", error);
+      console.log("Invalid timestamp:", error);
       return new Date(0);
     }
   };
@@ -500,7 +500,7 @@ export default function DashboardPage() {
         timestamp.toDate() instanceof Date
       );
     } catch (error) {
-      console.error("Invalid timestamp:", error);
+      console.log("Invalid timestamp:", error);
       return false;
     }
   };
@@ -571,7 +571,7 @@ export default function DashboardPage() {
       }
       return "Invalid Date";
     } catch (error) {
-      console.error("Error formatting timestamp:", error);
+      console.log("Error formatting timestamp:", error);
       return "Invalid Date";
     }
   };
@@ -685,7 +685,7 @@ export default function DashboardPage() {
         })
         .slice(0, 5);
     } catch (error) {
-      console.error("Error generating activity data:", error);
+      console.log("Error generating activity data:", error);
       return [];
     }
   };
@@ -832,7 +832,7 @@ export default function DashboardPage() {
               totalRevenue,
             };
           } catch (error) {
-            console.error("Error processing transaction data:", error);
+            console.log("Error processing transaction data:", error);
             return {
               successfulTransactions: [],
               totalRevenue: 0,
@@ -910,7 +910,7 @@ export default function DashboardPage() {
 
         console.log("Dashboard data processed successfully");
       } catch (error) {
-        console.error("Error fetching dashboard data:", error);
+        console.log("Error fetching dashboard data:", error);
         setError(
           error instanceof Error ? error.message : "An unknown error occurred"
         );

@@ -19,7 +19,7 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl)
   }).listen(443, (err) => {
     if (err) {
-      console.error('\x1b[31m%s\x1b[0m', '✖ Error starting server:', err) // Red text
+      console.log('\x1b[31m%s\x1b[0m', '✖ Error starting server:', err) // Red text
       throw err
     }
 

@@ -1,4 +1,3 @@
-// app/dashboard/layout.jsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -9,6 +8,7 @@ import Sidebar from "@/components/dashboard/Sidebar";
 import Image from "next/image";
 
 import { ReactNode } from "react";
+import SessionTimeoutProvider from "@/components/sessionTimeoutProvider";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -44,12 +44,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="flex bg-white text-gray-900">
-      {/* Sidebar */}
-      <Sidebar currentPath={pathname} />
+    <SessionTimeoutProvider>
+      <div className="flex bg-white text-gray-900">
+        {/* Sidebar */}
+        <Sidebar currentPath={pathname} />
 
-      {/* Main Content */}
-      <main className="flex-1 p-6">{children}</main>
-    </div>
+        {/* Main Content */}
+        <main className="flex-1 p-6">{children}</main>
+      </div>
+    </SessionTimeoutProvider>
   );
 }

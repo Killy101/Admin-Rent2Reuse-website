@@ -200,7 +200,7 @@ export default function PlansManagementPage() {
         setPlans(data);
         setLoading(false);
       } catch (error) {
-        console.error("Error fetching plans:", error);
+        console.log("Error fetching plans:", error);
         setLoading(false);
       }
     };
@@ -301,7 +301,7 @@ export default function PlansManagementPage() {
 
       closePlanModal();
     } catch (error) {
-      console.error("Error saving plan:", error);
+      console.log("Error saving plan:", error);
       alert("Failed to save plan. Please try again.");
     }
   };
@@ -312,7 +312,7 @@ export default function PlansManagementPage() {
         await deleteDoc(doc(db, "plans", planId));
         setPlans(plans.filter((plan) => plan.id !== planId));
       } catch (error) {
-        console.error("Error deleting plan:", error);
+        console.log("Error deleting plan:", error);
         alert("Failed to delete plan. Please try again.");
       }
     }

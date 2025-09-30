@@ -81,7 +81,7 @@ export default function AnnouncementsPage() {
       const url = await getDownloadURL(storageRef);
       setImageUrl(url);
     } catch (error) {
-      console.error("Error uploading image:", error);
+      console.log("Error uploading image:", error);
     } finally {
       setIsUploading(false);
     }
@@ -104,7 +104,7 @@ export default function AnnouncementsPage() {
       }
       resetForm();
     } catch (error) {
-      console.error("Error saving announcement:", error);
+      console.log("Error saving announcement:", error);
     }
   };
 

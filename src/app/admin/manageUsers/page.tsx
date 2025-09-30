@@ -722,7 +722,7 @@ export default function EnhancedUsersPage() {
 
       return "Invalid Date";
     } catch (error) {
-      console.error("Error formatting date:", error);
+      console.log("Error formatting date:", error);
       return "Invalid Date";
     }
   }, []);
@@ -853,7 +853,7 @@ export default function EnhancedUsersPage() {
         setSelectedUserReports(reports);
       }
     } catch (error) {
-      console.error("Error fetching user reports:", error);
+      console.log("Error fetching user reports:", error);
     }
   }, []);
 
@@ -903,7 +903,7 @@ export default function EnhancedUsersPage() {
                   endDate.toDate() > new Date() ? "Active" : "Expired";
               }
             } catch (subError) {
-              console.error("Error fetching subscription:", subError);
+              console.log("Error fetching subscription:", subError);
             }
           }
 
@@ -932,7 +932,7 @@ export default function EnhancedUsersPage() {
             sex: data.sex || "",
           });
         } catch (userError) {
-          console.error("Error processing user:", userError);
+          console.log("Error processing user:", userError);
         }
       }
 
@@ -957,7 +957,7 @@ export default function EnhancedUsersPage() {
       setSubscriptionDates(datesMap);
       setUserStats(stats);
     } catch (error) {
-      console.error("Error fetching users:", error);
+      console.log("Error fetching users:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -978,7 +978,7 @@ export default function EnhancedUsersPage() {
 
       setUserItems(items);
     } catch (error) {
-      console.error("Error fetching user items:", error);
+      console.log("Error fetching user items:", error);
     }
   };
 
@@ -1044,7 +1044,7 @@ export default function EnhancedUsersPage() {
       setShowSuspensionModal(false);
       setShowUserModal(false);
     } catch (error) {
-      console.error("Error updating user status:", error);
+      console.log("Error updating user status:", error);
     }
   };
 
@@ -1196,7 +1196,7 @@ export default function EnhancedUsersPage() {
       setSelectedUsers(new Set());
       setShowBulkActions(false);
     } catch (error) {
-      console.error("Error performing bulk action:", error);
+      console.log("Error performing bulk action:", error);
     }
   };
 
@@ -1207,7 +1207,7 @@ export default function EnhancedUsersPage() {
       });
       await fetchUsers();
     } catch (error) {
-      console.error("Error updating user status:", error);
+      console.log("Error updating user status:", error);
     }
   };
 

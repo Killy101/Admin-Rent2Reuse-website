@@ -110,7 +110,7 @@ const ItemsMap: React.FC = () => {
           return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         }
       } catch (error) {
-        console.error("Reverse geocoding failed:", error);
+        console.log("Reverse geocoding failed:", error);
         return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
       }
     },
@@ -164,7 +164,7 @@ const ItemsMap: React.FC = () => {
                   },
                 };
               } catch (error) {
-                console.error(
+                console.log(
                   `Failed to reverse geocode for item ${item.id}:`,
                   error
                 );
@@ -177,7 +177,7 @@ const ItemsMap: React.FC = () => {
 
         setItems(enhancedItems);
       } catch (err) {
-        console.error("Error fetching items:", err);
+        console.log("Error fetching items:", err);
         setError("Failed to fetch items from database");
       } finally {
         setLoading(false);
@@ -224,7 +224,7 @@ const ItemsMap: React.FC = () => {
         }
       });
     } catch (err) {
-      console.error("Error initializing map:", err);
+      console.log("Error initializing map:", err);
       setError("Failed to initialize map");
     }
 

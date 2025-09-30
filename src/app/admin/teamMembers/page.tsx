@@ -92,6 +92,7 @@ const roleAccess: {
     "/admin/announcements",
     "/admin/subscription/subscriptionsList",
     "/admin/profile",
+    "/admin/userLog",
   ],
   manageUsers: [
     "/admin",
@@ -101,6 +102,7 @@ const roleAccess: {
     "/admin/transaction",
     "/admin/subscription",
     "/admin/profile",
+    "/admin/userLog",
   ],
   financialViewer: [
     "/admin",
@@ -298,7 +300,7 @@ const sendEmailNotification = async (
   const configErrors = validateEmailJSConfig();
   if (configErrors.length > 0) {
     const errorMsg = `EmailJS configuration errors: ${configErrors.join(", ")}`;
-    console.error("❌ Configuration Error:", errorMsg);
+    console.log("❌ Configuration Error:", errorMsg);
     throw new Error(errorMsg);
   }
 
@@ -347,7 +349,7 @@ const sendEmailNotification = async (
 
     return response;
   } catch (error: any) {
-    console.error("❌ EmailJS Error Details:", error);
+    console.log("❌ EmailJS Error Details:", error);
     let errorMessage = "Failed to send email";
 
     if (error?.message) {
@@ -632,7 +634,7 @@ const TeamMemberPage = () => {
       }
       return undefined;
     } catch (error) {
-      console.error("Date conversion error:", error);
+      console.log("Date conversion error:", error);
       return undefined;
     }
   };
@@ -685,7 +687,7 @@ const TeamMemberPage = () => {
           setLoading(false);
         },
         (error) => {
-          console.error("Admins data error:", error);
+          console.log("Admins data error:", error);
           showNotification(
             "Error loading admins data: " + error.message,
             "error"
@@ -700,7 +702,7 @@ const TeamMemberPage = () => {
         unsubscribeFunctions.forEach((unsubscribe) => unsubscribe());
       };
     } catch (error) {
-      console.error("Error setting up listeners:", error);
+      console.log("Error setting up listeners:", error);
       const errorMsg = error instanceof Error ? error.message : String(error);
       showNotification("Error setting up data listeners: " + errorMsg, "error");
       setLoading(false);
@@ -759,7 +761,7 @@ const TeamMemberPage = () => {
           router.push("/auth/signin");
         }
       } catch (error) {
-        console.error("Auth check error:", error);
+        console.log("Auth check error:", error);
         router.push("/auth/signin");
       } finally {
         setAuthLoading(false);
@@ -856,7 +858,7 @@ const TeamMemberPage = () => {
             "success"
           );
         } catch (emailError) {
-          console.error("Email sending error:", emailError);
+          console.log("Email sending error:", emailError);
           const roleInfo = roleDefinitions[formData.adminRole];
           showNotification(
             `User created successfully!\n\nCredentials:\nUsername: ${username}\nPassword: ${password}\nRole: ${roleInfo.name}`,
@@ -874,7 +876,7 @@ const TeamMemberPage = () => {
         await deleteApp(tempApp);
       }
     } catch (error: any) {
-      console.error("Registration error:", error);
+      console.log("Registration error:", error);
       showNotification(`Failed to create user: ${error.message}`, "error");
     } finally {
       setActionLoading((prev) => ({ ...prev, register: null }));
@@ -902,7 +904,7 @@ const TeamMemberPage = () => {
         "success"
       );
     } catch (error: any) {
-      console.error("Error updating user status:", error);
+      console.log("Error updating user status:", error);
       showNotification(`Error updating user status: ${error.message}`, "error");
     } finally {
       setActionLoading((prev) => ({ ...prev, [memberId]: null }));
@@ -932,7 +934,7 @@ const TeamMemberPage = () => {
 
       showNotification(`${member.username} has been deleted`, "info");
     } catch (error: any) {
-      console.error("Error deleting user:", error);
+      console.log("Error deleting user:", error);
       showNotification(`Error deleting user: ${error.message}`, "error");
     } finally {
       setActionLoading((prev) => ({ ...prev, [memberId]: null }));
@@ -2040,7 +2042,7 @@ const TeamMemberPage = () => {
                     setShowPasswordChange(false);
                   }
                 } catch (error) {
-                  console.error("Error refetching user:", error);
+                  console.log("Error refetching user:", error);
                   setShowPasswordChange(false);
                 }
               }}

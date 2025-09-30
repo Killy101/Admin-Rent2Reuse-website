@@ -90,7 +90,7 @@ export default async function handler(
       ticketId: ticketId, // Return the ticketId for confirmation
     });
   } catch (err) {
-    console.error("EmailJS error details:", err);
+    console.log("EmailJS error details:", err);
 
     // More detailed error handling
     if (err instanceof Error) {

@@ -49,7 +49,7 @@ export function AdminAuthCheck({ children }: { children: React.ReactNode }) {
 
         setIsAuthorized(true);
       } catch (error) {
-        console.error("Auth check error:", error);
+        console.log("Auth check error:", error);
         localStorage.removeItem("isAuthenticated");
         router.replace("/auth/signin");
       } finally {
@@ -68,7 +68,7 @@ export function AdminAuthCheck({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("isAuthenticated");
       router.replace("/auth/signin");
     } catch (error) {
-      console.error("Sign out error:", error);
+      console.log("Sign out error:", error);
     }
   };
 

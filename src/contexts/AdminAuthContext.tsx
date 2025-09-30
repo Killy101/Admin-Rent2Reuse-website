@@ -48,7 +48,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error) {
-        console.error("Error checking admin status:", error);
+        console.log("Error checking admin status:", error);
         setIsAuthenticated(false);
         setAdminRole(null);
       }
