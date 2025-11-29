@@ -66,74 +66,69 @@ const sidebarStyles = {
 };
 
 // Navigation items array - Updated with better naming
-const navigationItems = [
+const navigationItems =[
   {
     name: "Dashboard",
     href: "/admin",
     icon: MdOutlineDashboard,
-    description: "Overview of system metrics",
+    description: "Overview of system metrics and insights",
   },
   {
-    name: "Item List",
+    name: "Inventory",
     href: "/admin/itemList",
     icon: TiThListOutline,
-    description: "Manage items in the system",
+    description: "Manage and monitor rentable items",
   },
   {
-    name: "User Management",
+    name: "Users",
     href: "/admin/manageUsers",
     icon: MdOutlineManageAccounts,
-    description: "Manage user accounts and permissions",
+    description: "Manage user accounts and details",
   },
   {
-    name: "Team Members",
+    name: "Team",
     href: "/admin/teamMembers",
     icon: RiTeamLine,
-    description: "Manage admin team members",
+    description: "Manage admin and staff members",
   },
-  // {
-  //   name: "User Directory",
-  //   href: "/admin/user",
-  //   icon: PiUserList,
-  //   description: "View all registered users",
-  // },
   {
-    name: "Transactions",
+    name: "Payments",
     href: "/admin/transaction",
     icon: MdOutlinePayment,
-    description: "View payment transactions",
+    description: "View and track payment transactions",
   },
   {
     name: "Subscriptions",
     href: "/admin/subscription",
     icon: MdOutlineSubscriptions,
-    description: "Monitor user subscriptions",
+    description: "View and manage subscription plans",
   },
   {
-    name: "Support Tickets",
+    name: "Support",
     href: "/admin/support",
     icon: MdOutlineSupportAgent,
-    description: "Handle customer support requests",
+    description: "Handle customer support tickets",
   },
   {
-    name: "User Issues",
+    name: "User Reports",
     href: "/admin/reports",
     icon: MdOutlineReportProblem,
-    description: "Handle user complaints and issues",
+    description: "Manage user complaints and issue reports",
   },
   {
     name: "Announcements",
     href: "/admin/announcements",
     icon: MdCircleNotifications,
-    description: "Manage system announcements",
+    description: "Create and manage system announcements",
   },
   {
-    name: "User Log",
+    name: "Activity Logs",
     href: "/admin/userLog",
     icon: MdOutlinePeople,
-    description: "View user activity logs",
+    description: "Monitor system and user activity logs",
   },
-];
+]
+
 
 // Enhanced role access configuration with more granular permissions
 const roleAccess: {
@@ -155,22 +150,19 @@ const roleAccess: {
     "/admin/profile",
     "/admin/userLog",
   ],
-  manageUsers: [
-    "/admin",
-    "/admin/manageUsers",
-    "/admin/itemList",
-    "/admin/transaction",
-    "/admin/subscription",
-    "/admin/profile",
-    "/admin/userLog",
-  ],
-  // New role suggestions
-  financialViewer: [
-    "/admin",
-    "/admin/transaction",
-    "/admin/subscription",
-    "/admin/profile",
-  ],
+ manageUsers: [
+  "/admin",
+  "/admin/manageUsers",
+  "/admin/itemList",
+  "/admin/userLog",
+  "/admin/profile"
+],
+ financialViewer: [
+  "/admin",
+  "/admin/transaction",
+  "/admin/subscription",
+  "/admin/profile"
+],
   contentManager: [
     "/admin",
     "/admin/itemList",
@@ -202,51 +194,35 @@ const getFilteredNavigationItems = (adminRole: string | null) => {
   return navigationItems.filter((item) => {
     if (!item.href) return false;
 
-    // Check access for this specific item
-    const hasItemAccess = hasAccess(adminRole, item.href);
+    const allowed = hasAccess(adminRole, item.href);
 
-    // Additional role-specific filtering
+    if (!allowed) return false;
+
+    // Additional UI filtering
     if (adminRole === "support") {
-      // Support role restrictions
-      const restrictedItems = [
-        "User Management",
-        "Team Members",
-        "Transactions",
-        "Item List",
-      ];
-      if (restrictedItems.includes(item.name)) {
-        return false;
-      }
+      const restricted = ["Users", "Team", "Payments", "Inventory"];
+      return !restricted.includes(item.name);
     }
 
     if (adminRole === "manageUsers") {
-      // User management role restrictions
-      const restrictedItems = [
-        "Team Members",
-        "Support Tickets",
-        "User Issues",
-        "Announcements",
-      ];
-      if (restrictedItems.includes(item.name)) {
-        return false;
-      }
+      const restricted = ["Team", "Support", "User Reports", "Announcements", "Payments", "Subscriptions"];
+      return !restricted.includes(item.name);
     }
 
     if (adminRole === "financialViewer") {
-      // Financial viewer restrictions
-      const allowedItems = ["Dashboard", "Transactions", "Subscriptions"];
-      return allowedItems.includes(item.name);
+      const allowedNames = ["Dashboard", "Payments", "Subscriptions"];
+      return allowedNames.includes(item.name);
     }
 
     if (adminRole === "contentManager") {
-      // Content manager restrictions
-      const allowedItems = ["Dashboard", "Item List", "Announcements"];
-      return allowedItems.includes(item.name);
+      const allowedNames = ["Dashboard", "Inventory", "Announcements"];
+      return allowedNames.includes(item.name);
     }
 
-    return hasItemAccess;
+    return true;
   });
 };
+
 
 interface SidebarProps {
   currentPath?: string;
