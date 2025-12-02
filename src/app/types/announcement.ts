@@ -6,4 +6,5 @@ export interface Announcement {
   createdAt: Date;
   isActive: boolean;
   isInactive: boolean;
+  order?: number;
 }

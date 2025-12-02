@@ -208,7 +208,7 @@ const EnhancedWeeklyPerformanceChart: React.FC<EnhancedWeeklyChartProps> = ({
               </div>
               
               <div>
-                <h3 className="text-3xl font-black bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent mb-2">
+                <h3 className="text-3xl p-5 font-black bg-gradient-to-r from-gray-900 via-blue-800 to-purple-800 bg-clip-text text-transparent mb-2">
                   Weekly Performance
                 </h3>
                 <p className="text-sm text-gray-600 font-medium flex items-center gap-2">

@@ -1343,8 +1343,8 @@ export default function DashboardPage() {
                         </p>
                         <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                           <span className="truncate">{activity.user}</span>
-                          <span>•</span>
-                          <span>{formatTimestamp(activity.timestamp)}</span>
+                          
+                          
                         </div>
                       </div>
                     </motion.div>
