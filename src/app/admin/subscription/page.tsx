@@ -31,6 +31,7 @@ import {
   DollarSign,
   Package,
   Settings,
+  AlertTriangle,
 } from "lucide-react";
 
 type Plan = {
@@ -73,6 +74,8 @@ export default function PlansManagementPage() {
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState<string | null>(null);
 
   // Form state
   const [planDescription, setPlanDescription] = useState("");
@@ -95,7 +98,7 @@ export default function PlansManagementPage() {
       icon: Crown,
     },
     {
-      name: "Platinum",
+      name: "Limited Time Offer",
       value: "platinum",
       color: PLAN_COLORS.platinum,
       icon: Gem,
@@ -111,9 +114,6 @@ export default function PlansManagementPage() {
 
   const durationOptions = [
     { name: "Monthly", value: "monthly" },
-    { name: "Quarterly", value: "quarterly" },
-    { name: "Semi-Annual", value: "semi-annual" },
-    { name: "Annual", value: "annual" },
   ];
 
   // Generate description based on inputs
@@ -125,9 +125,6 @@ export default function PlansManagementPage() {
       {
         Unlimited: "unlimited",
         monthly: "month",
-        quarterly: "quarter",
-        "semi-annual": "half year",
-        annual: "year",
       }[planDuration] || planDuration;
 
     const planTypeCapitalized =
@@ -150,7 +147,7 @@ export default function PlansManagementPage() {
     }
   }, [
     planPrice,
-    planRent,
+    planRent, 
     planList,
     planDuration,
     planType,
@@ -242,6 +239,44 @@ export default function PlansManagementPage() {
     setSelectedPlan(null);
   };
 
+  // Helper function to calculate end date based on duration
+  const calculateEndDate = (startDate: Date, duration: string): Date => {
+    const endDate = new Date(startDate);
+    switch (duration) {
+      case "monthly":
+        endDate.setMonth(endDate.getMonth() + 1);
+        break;
+      case "quarterly":
+        endDate.setMonth(endDate.getMonth() + 3);
+        break;
+      case "semi-annual":
+        endDate.setMonth(endDate.getMonth() + 6);
+        break;
+      case "annual":
+        endDate.setFullYear(endDate.getFullYear() + 1);
+        break;
+      default:
+        break;
+    }
+    return endDate;
+  };
+
+  // Helper function to get duration in days
+  const getDurationInDays = (duration: string): number => {
+    switch (duration) {
+      case "monthly":
+        return 30; // Approximate
+      case "quarterly":
+        return 91; // Approximate (3 months)
+      case "semi-annual":
+        return 182; // Approximate (6 months)
+      case "annual":
+        return 365;
+      default:
+        return 0;
+    }
+  };
+
   const isPlanTypeExists = (type: string, excludeId: string | null = null) => {
     return plans.some(
       (plan) => plan.planType === type && plan.id !== excludeId
@@ -306,16 +341,29 @@ export default function PlansManagementPage() {
     }
   };
 
-  const deletePlan = async (planId: string) => {
-    if (window.confirm("Are you sure you want to delete this plan?")) {
-      try {
-        await deleteDoc(doc(db, "plans", planId));
-        setPlans(plans.filter((plan) => plan.id !== planId));
-      } catch (error) {
-        console.log("Error deleting plan:", error);
-        alert("Failed to delete plan. Please try again.");
-      }
+  const openDeleteConfirm = (planId: string) => {
+    setPlanToDelete(planId);
+    setShowDeleteConfirm(true);
+  };
+
+  const deletePlan = async () => {
+    if (!planToDelete) return;
+    try {
+      await deleteDoc(doc(db, "plans", planToDelete));
+      setPlans(plans.filter((plan) => plan.id !== planToDelete));
+      setShowDeleteConfirm(false);
+      setPlanToDelete(null);
+    } catch (error) {
+      console.log("Error deleting plan:", error);
+      alert("Failed to delete plan. Please try again.");
+      setShowDeleteConfirm(false);
+      setPlanToDelete(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setPlanToDelete(null);
   };
 
   const getBgColorClass = (planType: string) => {
@@ -519,8 +567,8 @@ export default function PlansManagementPage() {
                           whileHover={{ y: -8, scale: 1.02 }}
                           className="group relative bg-white/80 backdrop-blur-lg rounded-3xl shadow-xl overflow-hidden border border-white/30 hover:shadow-2xl transition-all duration-500"
                         >
-                          {/* Popular badge for premium plans */}
-                          {plan.planType === "premium" && (
+                          {/* Popular badge for Limited-Time-Offer plans */}
+                          {plan.planType === "Limited-Time-Offer" && (
                             <motion.div
                               initial={{ opacity: 0, x: 50 }}
                               animate={{ opacity: 1, x: 0 }}
@@ -658,7 +706,7 @@ export default function PlansManagementPage() {
                               Edit Plan
                             </motion.button>
                             <motion.button
-                              onClick={() => deletePlan(plan.id)}
+                              onClick={() => openDeleteConfirm(plan.id)}
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                               className="group px-4 py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-2xl hover:from-red-600 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-xl"
@@ -903,24 +951,9 @@ export default function PlansManagementPage() {
                       <Calendar className="w-4 h-4 mr-2" />
                       Duration
                     </label>
-                    <select
-                      value={planType === "free" ? "unlimited" : planDuration}
-                      onChange={(e) => setPlanDuration(e.target.value)}
-                      className="w-full p-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all font-semibold"
-                      disabled={planType === "free"}
-                    >
-                      {durationOptions.map((option) => (
-                        <option
-                          key={option.value}
-                          value={option.value}
-                          disabled={
-                            planType === "free" && option.value !== "unlimited"
-                          }
-                        >
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="w-full p-4 border-2 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl font-semibold text-center text-gray-900">
+                      📅 Monthly (30 Days)
+                    </div>
                     {planType === "free" && (
                       <p className="text-sm text-blue-600 mt-2 flex items-center bg-blue-50 p-2 rounded-xl">
                         <Sparkles className="w-4 h-4 mr-1" />
@@ -1105,9 +1138,28 @@ export default function PlansManagementPage() {
                         <p className="text-3xl font-black text-indigo-600 mb-1">
                           ₱{planPrice.toLocaleString()}
                         </p>
-                        <p className="text-gray-600">
+                        <p className="text-gray-600 mb-4">
                           /{planType === "free" ? "unlimited" : planDuration}
                         </p>
+                        
+                        {/* Duration Details */}
+                        {planType !== "free" && (
+                          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 mt-4">
+                            <p className="text-sm text-gray-700 font-semibold mb-2">Duration Details:</p>
+                            <div className="space-y-1 text-sm text-gray-600">
+                              <p>
+                                <span className="font-medium">Duration:</span> 30 days (Monthly)
+                              </p>
+                              <p className="text-xs text-gray-500 mt-2">
+                                End Date (from start date): {new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -1147,6 +1199,53 @@ export default function PlansManagementPage() {
                     )}
                   </motion.button>
                 </motion.div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full border border-red-100"
+            >
+              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 text-center mb-2">
+                Delete Plan?
+              </h3>
+              <p className="text-gray-600 text-center mb-8">
+                Are you sure you want to delete this plan? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <motion.button
+                  onClick={cancelDelete}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 transition-colors font-semibold"
+                >
+                  No
+                </motion.button>
+                <motion.button
+                  onClick={deletePlan}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl hover:from-red-600 hover:to-red-700 transition-all shadow-lg hover:shadow-xl font-semibold"
+                >
+                  Yes
+                </motion.button>
               </div>
             </motion.div>
           </motion.div>

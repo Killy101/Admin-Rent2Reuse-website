@@ -14,6 +14,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import {
+  FiGift,
   FiUsers,
   FiFilter,
   FiDownload,
@@ -1295,6 +1296,12 @@ export default function EnhancedUsersPage() {
           icon: FiUserCheck,
           color: "green",
         },
+         {
+          label: "Limitied Time Offer",
+          value: userStats.premium,
+          icon: FiGift,
+          color: "purple",
+        },
         {
           label: "Premium",
           value: userStats.premium,
@@ -2079,6 +2086,51 @@ export default function EnhancedUsersPage() {
         : null;
 
     return (
+      //  <AnimatePresence>
+      //   {showDeleteConfirm && (
+      //     <motion.div
+      //       initial={{ opacity: 0 }}
+      //       animate={{ opacity: 1 }}
+      //       exit={{ opacity: 0 }}
+      //       className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      //     >
+      //       <motion.div
+      //         initial={{ scale: 0.9, opacity: 0 }}
+      //         animate={{ scale: 1, opacity: 1 }}
+      //         exit={{ scale: 0.9, opacity: 0 }}
+      //         className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full border border-red-100"
+      //       >
+      //         <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+      //           <AlertTriangle className="w-6 h-6 text-red-600" />
+      //         </div>
+      //         <h3 className="text-2xl font-bold text-gray-900 text-center mb-2">
+      //           Delete Plan?
+      //         </h3>
+      //         <p className="text-gray-600 text-center mb-8">
+      //           Are you sure you want to delete this plan? This action cannot be undone.
+      //         </p>
+      //         <div className="flex gap-3">
+      //           <motion.button
+      //             onClick={cancelDelete}
+      //             whileHover={{ scale: 1.02 }}
+      //             whileTap={{ scale: 0.98 }}
+      //             className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 transition-colors font-semibold"
+      //           >
+      //             No
+      //           </motion.button>
+      //           <motion.button
+      //             onClick={deletePlan}
+      //             whileHover={{ scale: 1.02 }}
+      //             whileTap={{ scale: 0.98 }}
+      //             className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl hover:from-red-600 hover:to-red-700 transition-all shadow-lg hover:shadow-xl font-semibold"
+      //           >
+      //             Yes
+      //           </motion.button>
+      //         </div>
+      //       </motion.div>
+      //     </motion.div>
+      //   )}
+      // </AnimatePresence>
       <div
         className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
         onClick={(e) => {
@@ -2765,6 +2817,7 @@ export default function EnhancedUsersPage() {
                           <option value="Free">Free</option>
                           <option value="Basic">Basic</option>
                           <option value="Premium">Premium</option>
+                          <option value="Limited-Time-Offer">Limited-Time-Offer</option>
                         </select>
                       </div>
 

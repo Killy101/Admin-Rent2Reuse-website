@@ -53,37 +53,44 @@ const UserLogsPage = () => {
   const itemsPerPage = 10;
 
   // Function to fetch admin role from admin collection
-  const fetchAdminRole = async (
-    uid: string,
-    email: string
-  ): Promise<string> => {
-    try {
-      if (uid) {
-        const adminDocRef = doc(db, "admin", uid);
-        const adminDoc = await getDoc(adminDocRef);
-        if (adminDoc.exists()) {
-          return adminDoc.data()?.role || adminDoc.data()?.adminRole || "user";
-        }
+  const fetchAdminRole = async (uid: string, email: string): Promise<string> => {
+  try {
+    console.log(`🔍 Fetching admin role for uid: ${uid}, email: ${email}`);
+
+    // 1️⃣ Check by UID first
+    if (uid) {
+      const adminDocRef = doc(db, "admin", uid);
+      const adminDoc = await getDoc(adminDocRef);
+      if (adminDoc.exists()) {
+        const role = adminDoc.data()?.adminRole || adminDoc.data()?.role;
+        console.log(`✅ Found admin by uid ${uid}: role = ${role}`);
+        if (role) return role;
       }
-
-      if (email) {
-        const adminCollection = collection(db, "admin");
-        const adminSnapshot = await getDocs(adminCollection);
-
-        for (const adminDoc of adminSnapshot.docs) {
-          const adminData = adminDoc.data();
-          if (adminData.email === email) {
-            return adminData.role || adminData.adminRole || "user";
-          }
-        }
-      }
-
-      return "user";
-    } catch (error) {
-      console.log("Error fetching admin role:", error);
-      return "user";
     }
-  };
+
+    // 2️⃣ Fallback: search by email
+    if (email) {
+      const adminCollection = collection(db, "admin");
+      const adminSnapshot = await getDocs(adminCollection);
+
+      for (const adminDoc of adminSnapshot.docs) {
+        const adminData = adminDoc.data();
+        if (adminData.email === email) {
+          const role = adminData.adminRole || adminData.role;
+          console.log(`✅ Found admin by email ${email}: role = ${role}`);
+          if (role) return role;
+        }
+      }
+    }
+
+    console.log(`ℹ️ ${email || uid} not found in admin collection, returning 'user'`);
+    return "user";
+  } catch (error) {
+    console.log("❌ Error fetching admin role:", error);
+    return "user";
+  }
+};
+
 
   // Fetch user logs from Firebase
   useEffect(() => {

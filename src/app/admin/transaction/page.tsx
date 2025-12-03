@@ -50,6 +50,7 @@ interface Transaction {
   planDetails: {
     planType: string;
   };
+  planDuration?: string; // Added: Plan duration (monthly, quarterly, semi-annual, annual)
   amount: number;
   paymentMethod: string;
   paymentProofUrl?: string;
@@ -128,6 +129,31 @@ const isValidTimestamp = (timestamp: any): timestamp is Timestamp => {
     console.log("Invalid timestamp:", error);
     return false;
   }
+};
+
+// Helper function to calculate end date based on duration
+const calculateEndDate = (startDate: Date | Timestamp, duration: string): Timestamp => {
+  const start = startDate instanceof Timestamp ? startDate.toDate() : startDate;
+  const endDate = new Date(start);
+  
+  switch (duration) {
+    case "monthly":
+      endDate.setMonth(endDate.getMonth() + 1);
+      break;
+    case "quarterly":
+      endDate.setMonth(endDate.getMonth() + 3);
+      break;
+    case "semi-annual":
+      endDate.setMonth(endDate.getMonth() + 6);
+      break;
+    case "annual":
+      endDate.setFullYear(endDate.getFullYear() + 1);
+      break;
+    default:
+      break;
+  }
+  
+  return Timestamp.fromDate(endDate);
 };
 
 // Helper function to get sort icon
@@ -218,38 +244,6 @@ export default function AdminTransactionsPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Add the permission check useEffect
-  // useEffect(() => {
-  //   const checkPermissions = async () => {
-  //     setAuthLoading(true);
-  //     try {
-  //       const user = auth.currentUser;
-
-  //       if (!user) {
-  //         router.push("/auth/signin");
-  //         return;
-  //       }
-
-  //       const adminDoc = await getDoc(doc(db, "admin", user.uid));
-
-  //       if (!adminDoc.exists()) {
-  //         setUserRole(null);
-  //         setAuthLoading(false);
-  //         return;
-  //       }
-
-  //       const role = adminDoc.data().role;
-  //       setUserRole(role);
-  //     } catch (error) {
-  //       console.log("Error checking permissions:", error);
-  //       setUserRole(null);
-  //     } finally {
-  //       setAuthLoading(false);
-  //     }
-  //   };
-
-  //   checkPermissions();
-  // }, []);
 
   // Fetch transactions data on component mount
   useEffect(() => {
@@ -263,6 +257,8 @@ export default function AdminTransactionsPage() {
           querySnapshot.docs.map(async (docSnap, index) => {
             const data = docSnap.data();
             let subscriptionData = null;
+            let endDate = data.endDate || null;
+            let planDuration: string | undefined = undefined;
 
             if (data.subscriptionId) {
               try {
@@ -271,9 +267,33 @@ export default function AdminTransactionsPage() {
                 );
                 if (subscriptionDoc.exists()) {
                   subscriptionData = subscriptionDoc.data();
+                  // Use existing endDate from subscription if available
+                  endDate = subscriptionData?.endDate || endDate;
                 }
               } catch (error) {
                 console.log("Error fetching subscription:", error);
+              }
+            }
+
+            // Fetch plan to get duration
+            if (data.planId) {
+              try {
+                const planDoc = await getDoc(doc(db, "plans", data.planId));
+                if (planDoc.exists()) {
+                  const planData = planDoc.data();
+                  planDuration = planData.duration; // Capture plan duration
+                  
+                  // If endDate is not available but startDate is, calculate it
+                  if (!endDate && (subscriptionData?.startDate || data.startDate)) {
+                    const startDate = subscriptionData?.startDate || data.startDate;
+                    if (planData.duration && startDate) {
+                      // Calculate end date based on plan duration
+                      endDate = calculateEndDate(startDate, planData.duration);
+                    }
+                  }
+                }
+              } catch (error) {
+                console.log("Error fetching plan:", error);
               }
             }
 
@@ -285,7 +305,8 @@ export default function AdminTransactionsPage() {
                 .toUpperCase()}-${String(index + 1).padStart(4, "0")}`,
               transactionId: data.transactionId || docSnap.id,
               startDate: subscriptionData?.startDate || data.startDate || null,
-              endDate: subscriptionData?.endDate || data.endDate || null,
+              endDate: endDate || null,
+              planDuration: planDuration, // Add plan duration to transaction
               createdAt: data.createdAt || data.createAt || Timestamp.now(), // Fallback to current time if missing
               subscription: subscriptionData || data.subscription || {},
               amount: Number(data.amount) || 0, // Ensure amount is always a number
@@ -393,23 +414,6 @@ export default function AdminTransactionsPage() {
     }),
     [transactions]
   );
-
-  // Add the permission check render logic
-  // if (authLoading) {
-  //   return (
-  //     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-  //       <div className="text-center">
-  //         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-  //         <p className="text-gray-600">Checking permissions...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
-
-  // // Check for required roles
-  // if (!userRole || (userRole !== "superAdmin" && userRole !== "manageUsers")) {
-  //   return <AccessDenied />;
-  // }
 
   // Error state UI
   if (error) {
@@ -1093,10 +1097,20 @@ export default function AdminTransactionsPage() {
                         <Calendar className="w-5 h-5 mr-2 text-purple-600" />
                         Subscription Period
                       </h4>
+                      
+                      {/* Duration */}
+                      {selectedTransaction.planDuration && (
+                        <div className="mb-4 p-3 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl border border-indigo-200">
+                          <p className="text-sm text-gray-700 font-semibold">
+                            <span className="text-indigo-700">📅 Duration:</span> 30 days (Monthly)
+                          </p>
+                        </div>
+                      )}
+                      
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div className="text-center p-3 bg-white rounded-xl border">
-                          <p className="text-gray-600 mb-1">Start Date</p>
-                          <p className="font-bold text-gray-900">
+                          <p className="text-gray-600 mb-1 font-medium">Start Date</p>
+                          <p className="font-bold text-gray-900 text-lg">
                             {formatDate(
                               selectedTransaction.subscription?.startDate ||
                                 selectedTransaction.startDate
@@ -1104,8 +1118,8 @@ export default function AdminTransactionsPage() {
                           </p>
                         </div>
                         <div className="text-center p-3 bg-white rounded-xl border">
-                          <p className="text-gray-600 mb-1">End Date</p>
-                          <p className="font-bold text-gray-900">
+                          <p className="text-gray-600 mb-1 font-medium">End Date</p>
+                          <p className="font-bold text-gray-900 text-lg">
                             {formatDate(
                               selectedTransaction.subscription?.endDate ||
                                 selectedTransaction.endDate
