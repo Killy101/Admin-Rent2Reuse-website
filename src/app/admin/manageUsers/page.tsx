@@ -14,6 +14,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import {
+  FiGift,
   FiUsers,
   FiFilter,
   FiDownload,
@@ -1295,6 +1296,12 @@ export default function EnhancedUsersPage() {
           icon: FiUserCheck,
           color: "green",
         },
+         {
+          label: "Limitied Time Offer",
+          value: userStats.premium,
+          icon: FiGift,
+          color: "purple",
+        },
         {
           label: "Premium",
           value: userStats.premium,
@@ -2079,6 +2086,51 @@ export default function EnhancedUsersPage() {
         : null;
 
     return (
+      //  <AnimatePresence>
+      //   {showDeleteConfirm && (
+      //     <motion.div
+      //       initial={{ opacity: 0 }}
+      //       animate={{ opacity: 1 }}
+      //       exit={{ opacity: 0 }}
+      //       className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      //     >
+      //       <motion.div
+      //         initial={{ scale: 0.9, opacity: 0 }}
+      //         animate={{ scale: 1, opacity: 1 }}
+      //         exit={{ scale: 0.9, opacity: 0 }}
+      //         className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full border border-red-100"
+      //       >
+      //         <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+      //           <AlertTriangle className="w-6 h-6 text-red-600" />
+      //         </div>
+      //         <h3 className="text-2xl font-bold text-gray-900 text-center mb-2">
+      //           Delete Plan?
+      //         </h3>
+      //         <p className="text-gray-600 text-center mb-8">
+      //           Are you sure you want to delete this plan? This action cannot be undone.
+      //         </p>
+      //         <div className="flex gap-3">
+      //           <motion.button
+      //             onClick={cancelDelete}
+      //             whileHover={{ scale: 1.02 }}
+      //             whileTap={{ scale: 0.98 }}
+      //             className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-2xl hover:bg-gray-200 transition-colors font-semibold"
+      //           >
+      //             No
+      //           </motion.button>
+      //           <motion.button
+      //             onClick={deletePlan}
+      //             whileHover={{ scale: 1.02 }}
+      //             whileTap={{ scale: 0.98 }}
+      //             className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl hover:from-red-600 hover:to-red-700 transition-all shadow-lg hover:shadow-xl font-semibold"
+      //           >
+      //             Yes
+      //           </motion.button>
+      //         </div>
+      //       </motion.div>
+      //     </motion.div>
+      //   )}
+      // </AnimatePresence>
       <div
         className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
         onClick={(e) => {
@@ -2116,102 +2168,111 @@ export default function EnhancedUsersPage() {
           )}
 
           <div className="space-y-4">
+            {/* Violation Category Cards */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
                 Violation Category
               </label>
-              <select
-                value={suspensionReason.category}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-                className="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                required
-              >
-                <option value="">Select violation category</option>
+              <div className="grid grid-cols-2 gap-3">
                 {Object.entries(RENTAL_VIOLATION_CATEGORIES).map(
                   ([key, category]) => (
-                    <option key={key} value={key}>
-                      {category.name}
-                    </option>
+                    <button
+                      key={key}
+                      onClick={() => handleCategoryChange(key)}
+                      className={`p-3 rounded-lg border-2 transition-all text-left ${
+                        suspensionReason.category === key
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold text-gray-900">
+                        {category.name}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {category.description}
+                      </p>
+                    </button>
                   )
                 )}
-              </select>
-              {currentViolationInfo && (
-                <p className="text-xs text-gray-600 mt-1">
-                  {currentViolationInfo.description}
-                </p>
-              )}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Severity Level
-              </label>
-              <select
-                value={suspensionReason.severity}
-                onChange={(e) => handleSeverityChange(e.target.value)}
-                className="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-red-500 focus:border-red-500"
-              >
-                <option value="low">Low - Warning/Short Suspension</option>
-                <option value="medium">Medium - Temporary Suspension</option>
-                <option value="high">High - Extended Suspension</option>
-                <option value="critical">
-                  Critical - Permanent Suspension
-                </option>
-              </select>
-              {currentSeverityInfo && (
-                <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                  <p className="font-medium text-gray-700">
-                    Recommended Duration:{" "}
-                    {currentSeverityInfo.suspensionDays === "permanent"
-                      ? "Permanent"
-                      : `${calculateSuspensionDuration(
-                          suspensionReason.category,
-                          suspensionReason.severity,
-                          selectedUserReports,
-                          currentViolationInfo
-                        )} days`}
-                  </p>
-                  <p className="text-gray-600 mt-1">
-                    Examples: {currentSeverityInfo.examples.join(", ")}
-                  </p>
+            {/* Severity Level Cards */}
+            {suspensionReason.category && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Severity Level
+                </label>
+                <div className="space-y-2">
+                  {currentViolationInfo &&
+                    Object.entries(currentViolationInfo.severityLevels).map(
+                      ([severity, details]) => {
+                        const severityColors = {
+                          low: "border-yellow-200 bg-yellow-50 hover:border-yellow-300",
+                          medium: "border-orange-200 bg-orange-50 hover:border-orange-300",
+                          high: "border-red-200 bg-red-50 hover:border-red-300",
+                          critical: "border-purple-200 bg-purple-50 hover:border-purple-300",
+                        };
+                        const severityIcons = {
+                          low: "🟡",
+                          medium: "🟠",
+                          high: "🔴",
+                          critical: "⚫",
+                        };
+
+                        return (
+                          <button
+                            key={severity}
+                            onClick={() => handleSeverityChange(severity)}
+                            className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                              suspensionReason.severity === severity
+                                ? `border-red-500 ${
+                                    severityColors[
+                                      severity as keyof typeof severityColors
+                                    ]
+                                  }`
+                                : `${
+                                    severityColors[
+                                      severity as keyof typeof severityColors
+                                    ]
+                                  }`
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="font-semibold text-gray-900 capitalize">
+                                  {severityIcons[
+                                    severity as keyof typeof severityIcons
+                                  ]}{" "}
+                                  {severity} Severity
+                                </p>
+                                <p className="text-sm text-gray-700 mt-1">
+                                  {details.description}
+                                </p>
+                                <p className="text-xs text-gray-600 mt-2">
+                                  Examples: {details.examples.join(", ")}
+                                </p>
+                              </div>
+                              <div className="ml-4 flex-shrink-0">
+                                <p className="text-sm font-bold text-gray-900">
+                                  {details.suspensionDays === "permanent"
+                                    ? "∞"
+                                    : `${calculateSuspensionDuration(
+                                        suspensionReason.category,
+                                        severity,
+                                        selectedUserReports,
+                                        currentViolationInfo
+                                      )} days`}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      }
+                    )}
                 </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Suspension Duration (Days)
-              </label>
-              <select
-                value={suspensionReason.duration || ""}
-                onChange={(e) =>
-                  setSuspensionReason((prev) => ({
-                    ...prev,
-                    duration: e.target.value
-                      ? Number(e.target.value)
-                      : undefined,
-                  }))
-                }
-                className="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                disabled={suspensionReason.severity === "critical"}
-              >
-                <option value="">Permanent</option>
-                <option value="1">1 Day</option>
-                <option value="3">3 Days</option>
-                <option value="7">7 Days</option>
-                <option value="14">14 Days</option>
-                <option value="21">21 Days</option>
-                <option value="30">30 Days</option>
-                <option value="45">45 Days</option>
-                <option value="60">60 Days</option>
-                <option value="90">90 Days</option>
-              </select>
-              {suspensionReason.severity === "critical" && (
-                <p className="text-xs text-red-600 mt-1">
-                  Critical violations result in permanent suspension
-                </p>
-              )}
-            </div>
+              </div>
+            )}
 
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -2756,6 +2817,7 @@ export default function EnhancedUsersPage() {
                           <option value="Free">Free</option>
                           <option value="Basic">Basic</option>
                           <option value="Premium">Premium</option>
+                          <option value="Limited-Time-Offer">Limited-Time-Offer</option>
                         </select>
                       </div>
 

@@ -201,10 +201,10 @@ const ItemListPage: React.FC = () => {
 
   // Calculate stats
   const availableItems = items.filter(
-    (item) => item.itemStatus === "available"
+    (item) => item.itemStatus?.toLowerCase() === "available"
   ).length;
   const unavailableItems = items.filter(
-    (item) => item.itemStatus !== "available"
+    (item) => item.itemStatus?.toLowerCase() !== "available"
   ).length;
 
   if (loading) {
@@ -509,12 +509,12 @@ const ItemListPage: React.FC = () => {
                         <div className="absolute top-3 right-3">
                           <Badge
                             variant={
-                              item.itemStatus === "Available"
+                              item.itemStatus?.toLowerCase() === "available"
                                 ? "default"
                                 : "secondary"
                             }
                             className={`${
-                              item.itemStatus === "Available"
+                              item.itemStatus?.toLowerCase() === "available"
                                 ? "bg-green-500 hover:bg-green-600"
                                 : "bg-blue-500"
                             } text-white shadow-lg`}
@@ -642,12 +642,12 @@ const ItemListPage: React.FC = () => {
                           <td className="px-6 py-4">
                             <Badge
                               variant={
-                                item.itemStatus === "Available"
+                                item.itemStatus?.toLowerCase() === "available"
                                   ? "default"
                                   : "secondary"
                               }
                               className={`${
-                                item.itemStatus === "Available"
+                                item.itemStatus?.toLowerCase() === "available"
                                   ? "bg-green-500 hover:bg-green-600"
                                   : "bg-gray-500"
                               } text-white`}
@@ -786,10 +786,10 @@ const ItemDetailsModal = ({
                 <span className="text-gray-900">{item.itemName}</span>
                 <Badge
                   variant={
-                    item.itemStatus === "Available" ? "default" : "secondary"
+                    item.itemStatus?.toLowerCase() === "available" ? "default" : "secondary"
                   }
                   className={`px-4 py-1.5 text-sm font-medium rounded-full ${
-                    item.itemStatus === "Available"
+                    item.itemStatus?.toLowerCase() === "available"
                       ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg"
                       : "bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-md"
                   } transition-all duration-300`}

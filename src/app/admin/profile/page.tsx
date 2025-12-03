@@ -574,31 +574,29 @@ export default function ProfilePage() {
 
       {/* Enhanced Header Section */}
       <div className={styles.header}>
-        <div className="flex flex-col lg:flex-row lg:items-center text-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl">
-              <Settings className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2">
-                Profile Settings
-              </h1>
-              <p className="text-gray-600 text-lg">
-                Manage your account settings and personal information
-              </p>
-            </div>
+        <div className="flex flex-col items-center text-center justify-center gap-4">
+          <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl">
+            <Settings className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2">
+              Profile Settings
+            </h1>
+            <p className="text-gray-600 text-lg">
+              Manage your account settings and personal information
+            </p>
           </div>
         </div>
       </div>
 
-      <div className={styles.profileGrid}>
-        {/* Enhanced Left Column - Profile Card */}
-        <div className="space-y-6">
+      <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12">
+        {/* Left Column - Profile Card */}
+        <div className="lg:col-span-1">
           {/* Main Profile Card */}
-          <div className={`${styles.card} p-8`}>
+          <div className={`${styles.card} p-8 sticky top-20 h-fit`}>
             <div className="flex flex-col items-center">
               {/* Enhanced Profile Image */}
-              <div className="relative group mb-8">
+              <div className="relative group mb-6">
                 <div className="w-[240px] h-[240px] rounded-full overflow-hidden border-4 border-white shadow-2xl group-hover:shadow-3xl transition-all duration-500 ring-4 ring-blue-100">
                   {previewImage ? (
                     <Image
@@ -633,30 +631,66 @@ export default function ProfilePage() {
               </div>
 
               {/* Enhanced Profile Info */}
-              <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-1 text-center break-words">
                 {adminData.firstName && adminData.lastName
                   ? `${adminData.firstName} ${adminData.lastName}`
                   : adminData.username || "Admin User"}
               </h2>
-              <p className="text-gray-500 flex items-center gap-2 mb-2 text-lg">
-                <Mail className="w-5 h-5 text-blue-500" />
-                {adminData.email}
+              <p className="text-sm text-gray-600 text-center break-words mb-4">
+                @{adminData.username}
               </p>
-              <p className="text-gray-500 flex items-center gap-2 mb-2">
-                <Shield className="w-4 h-4 text-green-500" />
-                {adminData.adminRole}
-              </p>
-              {adminData.address && (
-                <p className="text-gray-500 flex items-center gap-2 mb-6">
-                  <MapPin className="w-4 h-4 text-green-500" />
-                  {adminData.address}
-                </p>
+              
+              <div className="w-full space-y-3 mb-6">
+                <div className="flex items-center gap-3 text-sm text-gray-600">
+                  <Mail className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <span className="break-all">{adminData.email}</span>
+                </div>
+                {adminData.phoneNumber && (
+                  <div className="flex items-center gap-3 text-sm text-gray-600">
+                    <Phone className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                    <span>{adminData.phoneNumber}</span>
+                  </div>
+                )}
+                {adminData.address && (
+                  <div className="flex items-start gap-3 text-sm text-gray-600">
+                    <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <span className="break-words">{adminData.address}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Role Badge */}
+              <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-4 border ${
+                adminData.adminRole === "superAdmin"
+                  ? "bg-purple-100 text-purple-800 border-purple-200"
+                  : adminData.adminRole === "manageUsers"
+                  ? "bg-blue-100 text-blue-800 border-blue-200"
+                  : adminData.adminRole === "support"
+                  ? "bg-green-100 text-green-800 border-green-200"
+                  : "bg-gray-100 text-gray-800 border-gray-200"
+              }`}>
+                <Shield className="w-4 h-4 mr-1.5" />
+                {adminData.adminRole || "No Role"}
+              </div>
+
+              {/* Enhanced Status Badge */}
+              <div className="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 text-xs font-semibold mb-4 border border-green-200">
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500 mr-2 animate-pulse" />
+                Online & Active
+              </div>
+
+              {/* First Login Alert */}
+              {adminData.isFirstLogin && (
+                <div className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-orange-100 text-orange-700 text-xs font-medium border border-orange-200 mb-4">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>First login - please update profile</span>
+                </div>
               )}
+
+              {/* Last Updated */}
               {adminData.updatedAt && (
-                <p className="text-gray-400 text-sm flex items-center gap-2 mb-6">
-                  <Calendar className="w-4 h-4" />
-                  Last updated:{" "}
-                  {(() => {
+                <p className="text-gray-400 text-xs mt-4 pt-4 border-t border-gray-200 w-full text-center">
+                  Updated: {(() => {
                     try {
                       const date = new Date(adminData.updatedAt);
                       if (isNaN(date.getTime())) {
@@ -669,20 +703,6 @@ export default function ProfilePage() {
                     }
                   })()}
                 </p>
-              )}
-
-              {/* Enhanced Status Badge */}
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 text-sm font-semibold mb-8 border border-green-200">
-                <div className="w-3 h-3 rounded-full bg-green-500 mr-3 animate-pulse shadow-lg" />
-                Online & Active
-              </div>
-
-              {/* First Login Alert */}
-              {adminData.isFirstLogin && (
-                <div className="inline-flex items-center px-4 py-2 rounded-full bg-orange-100 text-orange-700 text-sm font-semibold mb-4 border border-orange-200">
-                  <AlertCircle className="w-4 h-4 mr-2" />
-                  First Login: Please update your profile and password.
-                </div>
               )}
             </div>
           </div>
@@ -721,9 +741,11 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <div className="grid md:grid-cols-2 gap-6">
+            {/* Form Fields */}
+            <div className="space-y-5">
+              {/* Username Field */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
                   Username <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -742,8 +764,9 @@ export default function ProfilePage() {
                 )}
               </div>
 
+              {/* Email Field */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
                   Email Address
                 </label>
                 <input
@@ -757,141 +780,145 @@ export default function ProfilePage() {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  First Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  className={getInputClass("firstName", !editMode)}
-                  value={adminData.firstName}
-                  onChange={(e) =>
-                    handleInputChange("firstName", e.target.value)
-                  }
-                  disabled={!editMode}
-                  required
-                  placeholder="Enter first name"
-                />
-                {errors.firstName && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {errors.firstName}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Last Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  className={getInputClass("lastName", !editMode)}
-                  value={adminData.lastName}
-                  onChange={(e) =>
-                    handleInputChange("lastName", e.target.value)
-                  }
-                  disabled={!editMode}
-                  required
-                  placeholder="Enter last name"
-                />
-                {errors.lastName && (
-                  <p className="text-sm text-red-500 mt-1">{errors.lastName}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Admin Role
-                </label>
-                <div
-                  className={`inline-flex items-center px-3 py-1 rounded-full ${
-                    adminData.adminRole === "superAdmin"
-                      ? "bg-purple-100 text-purple-800 border-purple-200"
-                      : adminData.adminRole === "manageUsers"
-                      ? "bg-blue-100 text-blue-800 border-blue-200"
-                      : adminData.adminRole === "support"
-                      ? "bg-green-100 text-green-800 border-green-200"
-                      : "bg-gray-100 text-gray-800 border-gray-200"
-                  } border`}
-                >
-                  <Shield className="w-4 h-4 mr-2" />
-                  <span className="font-medium">
-                    {adminData.adminRole || "No Role Assigned"}
-                  </span>
+              {/* First & Last Name Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className={getInputClass("firstName", !editMode)}
+                    value={adminData.firstName}
+                    onChange={(e) =>
+                      handleInputChange("firstName", e.target.value)
+                    }
+                    disabled={!editMode}
+                    required
+                    placeholder="First name"
+                  />
+                  {errors.firstName && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.firstName}
+                    </p>
+                  )}
                 </div>
-                <p className="text-xs text-gray-500">
-                  Your role determines your access permissions in the system
-                </p>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Last Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className={getInputClass("lastName", !editMode)}
+                    value={adminData.lastName}
+                    onChange={(e) =>
+                      handleInputChange("lastName", e.target.value)
+                    }
+                    disabled={!editMode}
+                    required
+                    placeholder="Last name"
+                  />
+                  {errors.lastName && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.lastName}
+                    </p>
+                  )}
+                </div>
               </div>
 
+              {/* Role & Phone Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Admin Role
+                  </label>
+                  <div
+                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
+                      adminData.adminRole === "superAdmin"
+                        ? "bg-purple-100 text-purple-800"
+                        : adminData.adminRole === "manageUsers"
+                        ? "bg-blue-100 text-blue-800"
+                        : adminData.adminRole === "support"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    {adminData.adminRole || "No Role"}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    className={getInputClass("phoneNumber", !editMode)}
+                    value={adminData.phoneNumber || ""}
+                    onChange={(e) =>
+                      handleInputChange("phoneNumber", e.target.value)
+                    }
+                    disabled={!editMode}
+                    placeholder="+1234567890"
+                  />
+                  {errors.phoneNumber && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.phoneNumber}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Address Field */}
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Phone Number
+                <label className="block text-sm font-semibold text-gray-700">
+                  Address
                 </label>
-                <input
-                  type="tel"
-                  className={getInputClass("phoneNumber", !editMode)}
-                  value={adminData.phoneNumber || ""}
-                  onChange={(e) =>
-                    handleInputChange("phoneNumber", e.target.value)
-                  }
+                <textarea
+                  value={adminData.address}
+                  onChange={(e) => handleInputChange("address", e.target.value)}
+                  className={getInputClass("address", !editMode)}
                   disabled={!editMode}
-                  placeholder="+1234567890"
+                  rows={3}
+                  placeholder="Enter your full address"
                 />
-                {errors.phoneNumber && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {errors.phoneNumber}
-                  </p>
+                {errors.address && (
+                  <p className="text-sm text-red-500 mt-1">{errors.address}</p>
                 )}
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Address
-              </label>
-              <textarea
-                value={adminData.address}
-                onChange={(e) => handleInputChange("address", e.target.value)}
-                className={getInputClass("address", !editMode)}
-                disabled={!editMode}
-                rows={3}
-                placeholder="Enter your full address"
-              />
-              {errors.address && (
-                <p className="text-sm text-red-500 mt-1">{errors.address}</p>
-              )}
-            </div>
-
-            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Shield className="w-6 h-6 text-blue-600" />
-              Security & Privacy
-            </h3>
-            <div className="space-y-3 shadow-lg">
+            {/* Security Section */}
+            <div className="border-t-2 border-gray-200 pt-6">
+              <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Lock className="w-5 h-5 text-blue-600" />
+                Security & Privacy
+              </h4>
               <a
-                href="/auth/forgotPassword"
-                className="w-full flex items-center shadow-lg justify-between p-4 rounded-xl border border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-all duration-300 group"
+                href="/auth/changePassword"
+                className="w-full flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-all duration-300 group"
                 onClick={(e) => {
                   e.preventDefault();
                   if (auth.currentUser) {
                     window.location.href = "/auth/changePassword";
                   } else {
-                    window.location.href = "/auth/login";
+                    window.location.href = "/auth/signin";
                   }
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <Lock className="w-5 h-5 text-blue-500 group-hover:text-blue-600" />
-                  <span className="text-gray-700 font-medium">
-                    Change Password
-                  </span>
+                  <Lock className="w-4 h-4 text-blue-500 group-hover:text-blue-600" />
+                  <span className="text-gray-700 font-medium text-sm">Change Password</span>
                 </div>
                 <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transform group-hover:translate-x-1 transition-all duration-300" />
               </a>
             </div>
 
+            {/* Form Actions */}
             {editMode && (
-              <div className="flex justify-end gap-4 pt-8 border-t border-gray-200 ">
+              <div className="flex justify-end gap-4 pt-8 border-t-2 border-gray-200">
                 <button
                   type="button"
                   onClick={() => {
@@ -904,23 +931,23 @@ export default function ProfilePage() {
                       setPreviewImage(adminData.profileImageUrl);
                     }
                   }}
-                  className="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-all duration-300 font-medium"
+                  className="px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className={styles.button}
+                  className={`${styles.button} flex items-center gap-2`}
                   disabled={loading}
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      <Loader2 className="w-5 h-5 animate-spin" />
                       Saving Changes...
                     </>
                   ) : (
                     <>
-                      <Save className="w-5 h-5 mr-2" />
+                      <Save className="w-5 h-5" />
                       Save Changes
                     </>
                   )}

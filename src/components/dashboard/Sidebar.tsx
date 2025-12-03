@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AdminAuthCheck } from "@/components/auth/AdminAuthCheck";
 
+
 const sidebarStyles = {
   nav: "flex-1 overflow-y-auto px-4 py-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent",
   navItem:
@@ -71,79 +72,93 @@ const navigationItems = [
     name: "Dashboard",
     href: "/admin",
     icon: MdOutlineDashboard,
-    description: "Overview of system metrics",
+    description: "Overview of system metrics and insights",
+    allowedRoles: ["superAdmin", "admin", "support", "manageUsers", "financialViewer", "contentManager"],
   },
   {
-    name: "Item List",
+    name: "Inventory",
     href: "/admin/itemList",
     icon: TiThListOutline,
-    description: "Manage items in the system",
+    description: "Manage and monitor rentable items",
+    allowedRoles: ["superAdmin", "admin", "manageUsers", "contentManager"],
   },
   {
-    name: "User Management",
+    name: "Users",
     href: "/admin/manageUsers",
     icon: MdOutlineManageAccounts,
-    description: "Manage user accounts and permissions",
+    description: "Manage user accounts and details",
+    allowedRoles: ["superAdmin", "admin", "manageUsers"],
   },
   {
-    name: "Team Members",
+    name: "Team",
     href: "/admin/teamMembers",
     icon: RiTeamLine,
-    description: "Manage admin team members",
+    description: "Manage admin and staff members",
+    allowedRoles: ["superAdmin", "admin"],
   },
-  // {
-  //   name: "User Directory",
-  //   href: "/admin/user",
-  //   icon: PiUserList,
-  //   description: "View all registered users",
-  // },
   {
-    name: "Transactions",
+    name: "Payments",
     href: "/admin/transaction",
     icon: MdOutlinePayment,
-    description: "View payment transactions",
+    description: "View and track payment transactions",
+    allowedRoles: ["superAdmin", "admin", "financialViewer"],
   },
   {
     name: "Subscriptions",
     href: "/admin/subscription",
     icon: MdOutlineSubscriptions,
-    description: "Monitor user subscriptions",
+    description: "View and manage subscription plans",
+    allowedRoles: ["superAdmin", "admin", "financialViewer"],
   },
   {
-    name: "Support Tickets",
+    name: "Support",
     href: "/admin/support",
     icon: MdOutlineSupportAgent,
-    description: "Handle customer support requests",
+    description: "Handle customer support tickets",
+    allowedRoles: ["superAdmin", "admin", "support"],
   },
   {
-    name: "User Issues",
+    name: "User Reports",
     href: "/admin/reports",
     icon: MdOutlineReportProblem,
-    description: "Handle user complaints and issues",
+    description: "Manage user complaints and issue reports",
+    allowedRoles: ["superAdmin", "admin", "support"],
   },
   {
     name: "Announcements",
     href: "/admin/announcements",
     icon: MdCircleNotifications,
-    description: "Manage system announcements",
+    description: "Create and manage system announcements",
+    allowedRoles: ["superAdmin", "admin", "support", "contentManager"],
   },
   {
-    name: "User Log",
+    name: "Activity Logs",
     href: "/admin/userLog",
     icon: MdOutlinePeople,
-    description: "View user activity logs",
+    description: "Monitor system and user activity logs",
+    allowedRoles: ["superAdmin", "admin", "support", "manageUsers"],
   },
+  {
+    name: "Settings",
+    href: "/admin/settings",
+    icon: MdOutlineManageAccounts,
+    description: "Manage your admin profile and settings",
+    allowedRoles: ["superAdmin", "admin", "support", "manageUsers", "financialViewer", "contentManager"],
+  }
 ];
 
-// Enhanced role access configuration with more granular permissions
-const roleAccess: {
-  superAdmin: ["*"];
-  admin: ["*"];
-  support: string[];
-  manageUsers: string[];
-  financialViewer: string[];
-  contentManager: string[];
-} = {
+
+// Define allowed admin roles
+export type AdminRole =
+  | "superAdmin"
+  | "admin"
+  | "support"
+  | "manageUsers"
+  | "financialViewer"
+  | "contentManager";
+
+// Enhanced role access configuration
+const roleAccess: Record<AdminRole, string[]> = {
   superAdmin: ["*"],
   admin: ["*"],
   support: [
@@ -159,12 +174,9 @@ const roleAccess: {
     "/admin",
     "/admin/manageUsers",
     "/admin/itemList",
-    "/admin/transaction",
-    "/admin/subscription",
-    "/admin/profile",
     "/admin/userLog",
+    "/admin/profile",
   ],
-  // New role suggestions
   financialViewer: [
     "/admin",
     "/admin/transaction",
@@ -179,74 +191,39 @@ const roleAccess: {
   ],
 };
 
-// Function to check if user has access to a specific path
-const hasAccess = (adminRole: string | null, path: string): boolean => {
+// Check if a role has access to a path
+const hasAccess = (adminRole: AdminRole | null, path: string): boolean => {
   if (!adminRole || !path) return false;
 
-  const allowedPaths = roleAccess[adminRole as keyof typeof roleAccess];
+  const allowedPaths = roleAccess[adminRole];
   if (!allowedPaths) return false;
 
-  // SuperAdmin has access to everything
   if (allowedPaths.includes("*")) return true;
 
-  // Check if path matches any allowed paths
   return allowedPaths.some(
     (allowedPath) => path === allowedPath || path.startsWith(allowedPath)
   );
 };
 
-// Function to filter navigation items based on admin role
-const getFilteredNavigationItems = (adminRole: string | null) => {
+// Filter navigation items based on role
+const getFilteredNavigationItems = (adminRole: AdminRole | null) => {
   if (!adminRole) return [];
 
+  const allowedPaths = roleAccess[adminRole];
+  if (!allowedPaths) return [];
+
+  // Full access roles see everything
+  if (allowedPaths.includes("*")) return navigationItems;
+
+  // Filter by allowedRoles and path access
   return navigationItems.filter((item) => {
     if (!item.href) return false;
-
-    // Check access for this specific item
-    const hasItemAccess = hasAccess(adminRole, item.href);
-
-    // Additional role-specific filtering
-    if (adminRole === "support") {
-      // Support role restrictions
-      const restrictedItems = [
-        "User Management",
-        "Team Members",
-        "Transactions",
-        "Item List",
-      ];
-      if (restrictedItems.includes(item.name)) {
-        return false;
-      }
-    }
-
-    if (adminRole === "manageUsers") {
-      // User management role restrictions
-      const restrictedItems = [
-        "Team Members",
-        "Support Tickets",
-        "User Issues",
-        "Announcements",
-      ];
-      if (restrictedItems.includes(item.name)) {
-        return false;
-      }
-    }
-
-    if (adminRole === "financialViewer") {
-      // Financial viewer restrictions
-      const allowedItems = ["Dashboard", "Transactions", "Subscriptions"];
-      return allowedItems.includes(item.name);
-    }
-
-    if (adminRole === "contentManager") {
-      // Content manager restrictions
-      const allowedItems = ["Dashboard", "Item List", "Announcements"];
-      return allowedItems.includes(item.name);
-    }
-
-    return hasItemAccess;
+    const roleAllowed = item.allowedRoles?.includes(adminRole) ?? true;
+    return roleAllowed && hasAccess(adminRole, item.href);
   });
 };
+
+
 
 interface SidebarProps {
   currentPath?: string;
@@ -283,11 +260,12 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
   const [user, loading, error] = useAuthState(auth);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [adminRole, setAdminRole] = useState<string | null>(null);
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [userDataLoading, setUserDataLoading] = useState(true);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [notificationCounts, setNotificationCounts] = useState<Record<string, number>>({});
 
   const pathname = usePathname();
 
@@ -323,7 +301,7 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
             );
 
             setUsername(adminData.username || null);
-            setAdminRole(adminData.adminRole || null);
+            setAdminRole((adminData.adminRole as AdminRole) || null);
             setProfileImage(adminData.profileImageUrl || null);
             setImageError(false);
 
@@ -366,6 +344,63 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
       setUserDataLoading(false);
     }
   }, [user, loading]);
+
+  // Set up notification listeners
+  useEffect(() => {
+    if (!adminRole) return;
+
+    const unsubscribers: (() => void)[] = [];
+
+    // Track open support tickets (not closed/resolved)
+    try {
+      const supportQuery = query(
+        collection(db, "support"),
+        where("status", "!=", "closed")
+      );
+
+      const unsubSupport = onSnapshot(supportQuery, (snapshot) => {
+        const activeTickets = snapshot.docs.filter((doc) => {
+          const status = doc.data().status?.toLowerCase();
+          return status !== "closed" && status !== "resolved";
+        });
+        setNotificationCounts((prev) => ({
+          ...prev,
+          support: activeTickets.length,
+        }));
+      });
+
+      unsubscribers.push(unsubSupport);
+    } catch (error) {
+      console.log("Error setting up support notifications:", error);
+    }
+
+    // Track unread reports (status !== "resolved")
+    try {
+      const reportsQuery = query(
+        collection(db, "reports"),
+        where("status", "!=", "resolved")
+      );
+
+      const unsubReports = onSnapshot(reportsQuery, (snapshot) => {
+        const unresolvedReports = snapshot.docs.filter((doc) => {
+          const status = doc.data().status?.toLowerCase();
+          return status !== "resolved";
+        });
+        setNotificationCounts((prev) => ({
+          ...prev,
+          reports: unresolvedReports.length,
+        }));
+      });
+
+      unsubscribers.push(unsubReports);
+    } catch (error) {
+      console.log("Error setting up reports notifications:", error);
+    }
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [adminRole]);
 
   // Handle image error
   const handleImageError = useCallback(() => {
@@ -550,6 +585,18 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
     },
     [pathname]
   );
+
+  // Notification badge component
+  const NotificationBadge = ({ count }: { count: number }) => {
+    if (count === 0) return null;
+    return (
+      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center">
+        <div className="h-6 w-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg animate-pulse">
+          {count > 9 ? "9+" : count}
+        </div>
+      </div>
+    );
+  };
 
   // Enhanced role badge styling
   const getRoleBadgeStyle = (adminRole: string | null) => {
@@ -754,6 +801,7 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
             {getFilteredNavigationItems(adminRole).map((item) => {
               // Regular navigation items
               const itemIsActive = isActive(item.href);
+              const notificationCount = notificationCounts[item.href?.split("/").pop() || ""] || 0;
 
               return (
                 <Link
@@ -769,6 +817,9 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
                 >
                   <item.icon className={cn(sidebarStyles.icon, "mr-3")} />
                   <span className="font-medium">{item.name}</span>
+                  {notificationCount > 0 && (
+                    <NotificationBadge count={notificationCount} />
+                  )}
                   {itemIsActive && (
                     <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-l-full shadow-sm" />
                   )}

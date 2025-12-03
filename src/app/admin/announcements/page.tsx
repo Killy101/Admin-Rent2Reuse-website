@@ -10,10 +10,12 @@ import {
   deleteDoc,
   updateDoc,
   Timestamp,
+  query,
+  orderBy,
 } from "firebase/firestore";
 import { db } from "@/app/firebase/config"; // Adjust the import path as necessary
 import { motion } from "framer-motion";
-import { Pencil, Trash2, Upload } from "lucide-react";
+import { Pencil, Trash2, Upload, ChevronUp, ChevronDown, X } from "lucide-react";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function AnnouncementsPage() {
@@ -27,11 +29,13 @@ export default function AnnouncementsPage() {
   const [expandedMessages, setExpandedMessages] = useState<{
     [key: string]: boolean;
   }>({});
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingAnnouncementData, setPendingAnnouncementData] = useState<any>(null);
 
-  // Real-time fetch
+  // Real-time fetch with ordering
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      collection(db, "announcements"),
+      query(collection(db, "announcements"), orderBy("order", "asc")),
       (snapshot) => {
         const data = snapshot.docs.map((doc) => {
           const d = doc.data();
@@ -39,13 +43,14 @@ export default function AnnouncementsPage() {
             id: doc.id,
             title: d.title,
             message: d.message,
-
             imageUrl: d.imageUrl,
             createdAt:
               d.createdAt instanceof Timestamp
                 ? d.createdAt.toDate()
                 : new Date(),
             isActive: d.isActive,
+            isInactive: !d.isActive,
+            order: d.order || 0,
           } as Announcement;
         });
         setAnnouncements(data);
@@ -88,24 +93,50 @@ export default function AnnouncementsPage() {
   };
 
   const handleSave = async () => {
+    if (!title.trim() || !message.trim()) {
+      alert("Please fill in title and message");
+      return;
+    }
+
+    // Calculate the order for new announcements (place at end)
+    const maxOrder = announcements.length > 0 
+      ? Math.max(...announcements.map(a => a.order || 0)) 
+      : 0;
+
     const announcementData = {
       title,
       message,
       imageUrl,
       createdAt: Timestamp.now(),
       isActive: true,
+      order: editingId ? undefined : maxOrder + 1, // Only set order for new announcements
     };
 
+    setPendingAnnouncementData(announcementData);
+    setShowConfirmModal(true);
+  };
+
+  const confirmAnnouncement = async () => {
     try {
       if (editingId) {
-        await updateDoc(doc(db, "announcements", editingId), announcementData);
+        const updateData = { ...pendingAnnouncementData };
+        delete updateData.order; // Don't update order when editing
+        await updateDoc(doc(db, "announcements", editingId), updateData);
       } else {
-        await addDoc(collection(db, "announcements"), announcementData);
+        await addDoc(collection(db, "announcements"), pendingAnnouncementData);
       }
       resetForm();
+      setShowConfirmModal(false);
+      setPendingAnnouncementData(null);
     } catch (error) {
       console.log("Error saving announcement:", error);
+      alert("Error saving announcement");
     }
+  };
+
+  const cancelAnnouncement = () => {
+    setShowConfirmModal(false);
+    setPendingAnnouncementData(null);
   };
 
   const handleEdit = (announcement: Announcement) => {
@@ -133,6 +164,32 @@ export default function AnnouncementsPage() {
       ...prev,
       [id]: !prev[id],
     }));
+  };
+
+  const moveAnnouncement = async (id: string, direction: "up" | "down") => {
+    const currentIndex = announcements.findIndex((a) => a.id === id);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= announcements.length) return;
+
+    // Swap order values
+    const currentAnnouncement = announcements[currentIndex];
+    const nextAnnouncement = announcements[newIndex];
+
+    const tempOrder = currentAnnouncement.order || currentIndex;
+    const nextOrder = nextAnnouncement.order || newIndex;
+
+    try {
+      await updateDoc(doc(db, "announcements", currentAnnouncement.id), {
+        order: nextOrder,
+      });
+      await updateDoc(doc(db, "announcements", nextAnnouncement.id), {
+        order: tempOrder,
+      });
+    } catch (error) {
+      console.log("Error reordering announcements:", error);
+    }
   };
 
   return (
@@ -370,10 +427,28 @@ export default function AnnouncementsPage() {
               </div>
 
               {/* Actions Container */}
-              <div className="flex items-center justify-between p-3 bg-white border-t border-gray-100">
+              <div className="flex flex-wrap items-center justify-between p-3 bg-white border-t border-gray-100 gap-2">
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => moveAnnouncement(a.id, "up")}
+                    disabled={announcements[0]?.id === a.id}
+                    className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors disabled:text-gray-300 disabled:cursor-not-allowed"
+                    title="Move up"
+                  >
+                    <ChevronUp size={18} />
+                  </button>
+                  <button
+                    onClick={() => moveAnnouncement(a.id, "down")}
+                    disabled={announcements[announcements.length - 1]?.id === a.id}
+                    className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors disabled:text-gray-300 disabled:cursor-not-allowed"
+                    title="Move down"
+                  >
+                    <ChevronDown size={18} />
+                  </button>
+                </div>
                 <button
                   onClick={() => handleEdit(a)}
-                  className="flex items-center gap-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2 py-1 rounded-md transition-colors"
+                  className="flex items-center gap-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2 py-1 rounded-md transition-colors text-sm"
                 >
                   <Pencil size={16} /> Edit
                 </button>
@@ -389,7 +464,7 @@ export default function AnnouncementsPage() {
                 </button>
                 <button
                   onClick={() => handleDelete(a.id)}
-                  className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-md transition-colors"
+                  className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-md transition-colors text-sm"
                 >
                   <Trash2 size={16} /> Delete
                 </button>
@@ -398,6 +473,69 @@ export default function AnnouncementsPage() {
           ))}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-auto"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Confirm Announcement</h3>
+              <button
+                onClick={cancelAnnouncement}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-6 space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Title:</p>
+                <p className="text-base font-semibold text-gray-900">{title}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Message:</p>
+                <p className="text-sm text-gray-700 line-clamp-3">{message}</p>
+              </div>
+              {imageUrl && (
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Image:</p>
+                  <div className="w-full h-32 rounded-md overflow-hidden bg-gray-100">
+                    <img
+                      src={imageUrl}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <p className="text-center text-gray-700 font-semibold mb-6">
+              Do you want to {editingId ? "update" : "add"} this announcement?
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={cancelAnnouncement}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+              >
+                No, Cancel
+              </button>
+              <button
+                onClick={confirmAnnouncement}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-md hover:from-purple-700 hover:to-blue-700 font-medium transition-colors"
+              >
+                Yes, {editingId ? "Update" : "Add"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

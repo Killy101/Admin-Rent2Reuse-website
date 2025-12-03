@@ -123,101 +123,115 @@ const roleAccess: {
 const roleDefinitions = {
   superAdmin: {
     name: "Super Admin",
-    description: "Full system access with all administrative privileges",
+    description: "Highest-level administrator with unrestricted control over all system features.",
     icon: Crown,
-    color: "from-purple-500 to-pink-500",
+    color: "from-purple-600 to-pink-600",
     bgColor: "from-purple-100 to-pink-100",
     textColor: "text-purple-800",
     permissions: [
-      "Full system access",
-      "User management",
-      "Financial oversight",
-      "Content management",
+      "Full dashboard access",
+      "Manage inventory",
+      "Manage all user accounts",
+      "Manage admin team members",
+      "View and manage payments",
+      "Manage subscriptions",
+      "Handle support tickets",
+      "View and manage user reports",
+      "Create and edit announcements",
+      "View all activity logs",
       "System configuration",
-      "All reporting features",
     ],
   },
+
   admin: {
     name: "Admin",
-    description: "Full system access with all administrative privileges",
-    icon: Crown,
-    color: "from-purple-500 to-pink-500",
-    bgColor: "from-purple-100 to-pink-100",
-    textColor: "text-purple-800",
+    description: "General administrator with full access except high-level system configuration.",
+    icon: Shield,
+    color: "from-indigo-500 to-blue-500",
+    bgColor: "from-indigo-100 to-blue-100",
+    textColor: "text-indigo-800",
     permissions: [
-      "Full system access",
-      "User management",
-      "Financial oversight",
-      "Content management",
-      "System configuration",
-      "All reporting features",
+      "Full dashboard access",
+      "Manage inventory",
+      "Manage user accounts",
+      "Manage admin team members",
+      "View payments",
+      "Manage subscriptions",
+      "Handle support tickets",
+      "Manage user reports",
+      "Create announcements",
+      "View activity logs",
     ],
   },
+
   support: {
     name: "Support Specialist",
-    description: "Handle customer support tickets and user assistance",
+    description: "Focused on addressing customer issues, complaints, and user concerns.",
     icon: Headphones,
     color: "from-blue-500 to-cyan-500",
     bgColor: "from-blue-100 to-cyan-100",
     textColor: "text-blue-800",
     permissions: [
-      "View user directory",
+      "Access dashboard insights",
       "Handle support tickets",
-      "Manage user issues",
+      "View user directory",
+      "View subscriptions",
       "View announcements",
-      "Access subscription info",
-      "Generate support reports",
+      "Create support reports",
+      "View user reports",
     ],
   },
-  manageUsers: {
-    name: "User Manager",
-    description: "Comprehensive user and system management capabilities",
-    icon: UserCheck,
-    color: "from-green-500 to-teal-500",
-    bgColor: "from-green-100 to-teal-100",
-    textColor: "text-green-800",
-    permissions: [
-      "User management",
-      "Item management",
-      "Transaction oversight",
-      "Subscription management",
-      "User directory access",
-      "System administration",
-    ],
-  },
+
+manageUsers: {
+  name: "User Manager",
+  description: "Responsible for user onboarding, permissions, and overall user directory management.",
+  icon: UserCheck,
+  color: "from-green-500 to-emerald-500",
+  bgColor: "from-green-100 to-emerald-100",
+  textColor: "text-green-800",
+  permissions: [
+    "Manage user accounts",
+    "View dashboard insights",
+    "Access user directory",
+    "View activity logs",
+  ],
+},
+
   financialViewer: {
     name: "Financial Viewer",
-    description: "View and monitor financial transactions and subscriptions",
+    description: "Monitors transactions and financial performance without modification access.",
     icon: DollarSign,
     color: "from-yellow-500 to-orange-500",
     bgColor: "from-yellow-100 to-orange-100",
     textColor: "text-yellow-800",
     permissions: [
-      "View transactions",
-      "Monitor subscriptions",
-      "Access user data",
+      "View dashboard insights",
+      "View payment transactions",
+      "View revenue analytics",
+      "View subscription activities",
+      "Access user directory",
       "Financial reporting",
-      "Revenue analytics",
-      "Payment oversight",
     ],
   },
+
   contentManager: {
     name: "Content Manager",
-    description: "Manage platform content and announcements",
+    description: "Controls platform content, inventory listing, and announcement posting.",
     icon: FileText,
     color: "from-indigo-500 to-purple-500",
     bgColor: "from-indigo-100 to-purple-100",
     textColor: "text-indigo-800",
     permissions: [
-      "Item management",
-      "Content moderation",
-      "Announcement management",
-      "Platform content",
-      "User-generated content",
-      "Content reporting",
+      "Manage inventory",
+      "Moderate platform content",
+      "Create and edit announcements",
+      "Manage item listings",
+      "Handle content-related reports",
+      "View dashboard insights",
     ],
   },
 };
+
 
 interface TeamMember {
   id: string;
@@ -642,7 +656,7 @@ const TeamMemberPage = () => {
   // Transform document data safely
   const transformDocumentData = (doc: any): TeamMember => {
     const data = doc.data();
-    return {
+    const member: TeamMember = {
       id: doc.id,
       uid: data.uid,
       username: data.username || "Unknown User",
@@ -664,6 +678,64 @@ const TeamMemberPage = () => {
       phoneNumber: data.phoneNumber || "",
       address: data.address || "",
     };
+    
+    // Log if profileImageUrl is missing or empty for debugging
+    if (!member.profileImageUrl) {
+      console.log(
+        `⚠️ Member ${member.username} has no profileImageUrl. Full data:`,
+        data
+      );
+    } else {
+      console.log(
+        `✅ Member ${member.username} has profileImageUrl: ${member.profileImageUrl.substring(0, 50)}...`
+      );
+    }
+    
+    return member;
+  };
+
+  // Migration function to add missing profileImageUrl to existing documents
+  const migrateExistingDocuments = async () => {
+    try {
+      console.log("🔄 Starting migration of existing admin documents...");
+      const adminsQuery = query(collection(db, "admin"));
+      const snapshot = await getDocs(adminsQuery);
+
+      let migratedCount = 0;
+      
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        // Only migrate if profileImageUrl is missing or undefined
+        if (data.profileImageUrl === undefined) {
+          await updateDoc(doc.ref, {
+            profileImageUrl: "",
+            firstName: data.firstName || "",
+            lastName: data.lastName || "",
+            phoneNumber: data.phoneNumber || "",
+            address: data.address || "",
+          });
+          migratedCount++;
+          console.log(`✅ Migrated document: ${data.username}`);
+        }
+      }
+      
+      if (migratedCount > 0) {
+        console.log(`✅ Migration completed: ${migratedCount} documents updated`);
+        showNotification(
+          `Migration completed: ${migratedCount} documents updated with profileImageUrl field`,
+          "success"
+        );
+      } else {
+        console.log("ℹ️ All documents already have profileImageUrl field");
+      }
+    } catch (error) {
+      console.log("❌ Migration error:", error);
+      showNotification(
+        "Error during document migration: " +
+          (error instanceof Error ? error.message : String(error)),
+        "error"
+      );
+    }
   };
 
   // Set up Firebase listeners
@@ -788,6 +860,16 @@ const TeamMemberPage = () => {
     setActionLoading((prev) => ({ ...prev, register: "creating" }));
 
     try {
+      // Only superAdmin can add new members
+      if (currentUser?.adminRole !== "superAdmin") {
+        showNotification(
+          "Only Super Admin users can add new admin members",
+          "error"
+        );
+        setActionLoading((prev) => ({ ...prev, register: null }));
+        return;
+      }
+
       const currentAuthUser = auth.currentUser;
       if (!currentAuthUser) {
         showNotification(
@@ -840,6 +922,11 @@ const TeamMemberPage = () => {
           createdBy: currentAuthUser.uid,
           updatedAt: new Date(),
           permissions: permissions,
+          profileImageUrl: "", // Initialize empty profile image
+          firstName: "",
+          lastName: "",
+          phoneNumber: "",
+          address: "",
         });
 
         try {
@@ -1189,6 +1276,8 @@ const TeamMemberPage = () => {
       null | "deactivate" | "delete"
     >(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const [modalTab, setModalTab] = useState<"details" | "changeRole">("details");
+    const [selectedRoleKey, setSelectedRoleKey] = useState<keyof typeof roleDefinitions | "">("");
 
     if (!selectedMember) return null;
 
@@ -1196,6 +1285,29 @@ const TeamMemberPage = () => {
     const roleKey = selectedMember.adminRole || "admin";
     const roleDisplay = getRoleDisplay(roleKey as keyof typeof roleDefinitions);
     const IconComponent = roleDisplay.icon;
+
+    // Determine whether the current admin can change roles
+    // Both superAdmin and admin can change roles
+    const canChangeRoles = (): boolean => {
+      if (!currentUser) return false;
+      
+      // SuperAdmin cannot change their own role
+      if (currentUser.adminRole === "superAdmin" && currentUser.id === selectedMember.id) {
+        return false;
+      }
+      
+      if (currentUser.adminRole === "superAdmin") return true; // superAdmin can change any role (except themselves)
+      
+      if (currentUser.adminRole === "admin") {
+        // admin cannot change superAdmin members
+        if (selectedMember.adminRole === "superAdmin") return false;
+        // admin cannot change other admins
+        if (selectedMember.adminRole === "admin") return false;
+        return true;
+      }
+      
+      return false; // other roles cannot change roles
+    };
 
     const formatDate = (dateString?: string) => {
       if (!dateString) return "Not available";
@@ -1275,6 +1387,42 @@ const TeamMemberPage = () => {
       }
     };
 
+    const handleChangeRole = async () => {
+      if (!selectedRoleKey) {
+        showNotification("Please select a role to assign", "error");
+        return;
+      }
+
+      if (!canChangeRoles()) {
+        showNotification("You do not have permission to change roles", "error");
+        return;
+      }
+
+      setActionLoading(true);
+      try {
+        await updateDoc(doc(db, "admin", selectedMember.id), {
+          adminRole: selectedRoleKey,
+          permissions: roleAccess[selectedRoleKey] || [],
+          updatedAt: new Date(),
+        });
+
+        const updatedDoc = await getDoc(doc(db, "admin", selectedMember.id));
+        if (updatedDoc.exists()) {
+          const updated = transformDocumentData(updatedDoc);
+          setSelectedMember(updated);
+        }
+
+        showNotification("Role updated successfully", "success");
+        setModalTab("details");
+        setSelectedRoleKey("");
+      } catch (error: any) {
+        console.log("Error updating role:", error);
+        showNotification("Failed to update role: " + (error.message || error), "error");
+      } finally {
+        setActionLoading(false);
+      }
+    };
+
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1283,54 +1431,85 @@ const TeamMemberPage = () => {
               <h2 className="text-xl font-bold text-gray-900">
                 Admin User Details
               </h2>
-              <button
-                onClick={() => setShowMemberDetails(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-3">
+                <div className="inline-flex rounded-lg bg-gray-100 p-1">
+                  <button 
+                    onClick={() => setModalTab("details")} 
+                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${modalTab === "details" ? "bg-white shadow-sm" : "text-gray-600 hover:text-gray-900"}`}
+                  >
+                    Details
+                  </button>
+                  {/* Hide Change Role tab if selected member is superAdmin and current user is not superAdmin */}
+                  {!(selectedMember.adminRole === "superAdmin" && currentUser?.adminRole !== "superAdmin") && (
+                    <button 
+                      onClick={() => setModalTab("changeRole")} 
+                      disabled={!canChangeRoles()}
+                      className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${modalTab === "changeRole" ? "bg-white shadow-sm" : canChangeRoles() ? "text-gray-600 hover:text-gray-900" : "text-gray-400 cursor-not-allowed"}`}
+                      title={!canChangeRoles() ? "You don't have permission to change roles" : "Switch member role"}
+                    >
+                      Change Role
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowMemberDetails(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
             <div className="space-y-6">
-              <div className="text-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden">
-                  {selectedMember.profileImageUrl ? (
-                    <img
-                      src={selectedMember.profileImageUrl}
-                      alt={selectedMember.username}
-                      className="w-24 h-24 object-cover rounded-full"
-                    />
-                  ) : (
-                    <User className="w-12 h-12 text-indigo-600" />
-                  )}
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900">
-                  {selectedMember.username}
-                </h3>
-                <div className="flex items-center justify-center mt-2 space-x-2">
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                      selectedMember.accountStatus === "approved"
-                        ? "bg-green-100 text-green-800"
-                        : selectedMember.accountStatus === "deactivated"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {selectedMember.accountStatus === "approved"
-                      ? "Active"
-                      : selectedMember.accountStatus.charAt(0).toUpperCase() +
-                        selectedMember.accountStatus.slice(1)}
-                  </span>
-                  {(selectedMember.isFirstLogin ||
-                    selectedMember.temporaryPassword) && (
-                    <span className="inline-block px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
-                      First Login Required
-                    </span>
-                  )}
-                </div>
-              </div>
+              {modalTab === "details" && (
+                <>
+                  <div className="text-center">
+                    <div className="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden">
+                      {selectedMember.profileImageUrl ? (
+                        <img
+                          src={selectedMember.profileImageUrl}
+                          alt={selectedMember.username}
+                          className="w-24 h-24 object-cover rounded-full"
+                          crossOrigin="anonymous"
+                          onError={(e) => {
+                            console.log(`⚠️ Failed to load modal image for ${selectedMember.username}:`, selectedMember.profileImageUrl);
+                            e.currentTarget.style.display = 'none';
+                          }}
+                          onLoad={() => {
+                            console.log(`✅ Modal image loaded for ${selectedMember.username}`);
+                          }}
+                        />
+                      ) : (
+                        <User className="w-12 h-12 text-indigo-600" />
+                      )}
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      {selectedMember.username}
+                    </h3>
+                    <div className="flex items-center justify-center mt-2 space-x-2">
+                      <span
+                        className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                          selectedMember.accountStatus === "approved"
+                            ? "bg-green-100 text-green-800"
+                            : selectedMember.accountStatus === "deactivated"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {selectedMember.accountStatus === "approved"
+                          ? "Active"
+                          : selectedMember.accountStatus.charAt(0).toUpperCase() +
+                            selectedMember.accountStatus.slice(1)}
+                      </span>
+                      {(selectedMember.isFirstLogin ||
+                        selectedMember.temporaryPassword) && (
+                        <span className="inline-block px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
+                          First Login Required
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
                     Contact Information
@@ -1435,36 +1614,90 @@ const TeamMemberPage = () => {
                   )}
                 </div>
               </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-              <button
-                onClick={() => setShowMemberDetails(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-              >
-                Close
-              </button>
-              {selectedMember.accountStatus !== "deleted" && (
-                <>
-                  <button
-                    onClick={() => setShowConfirm("deactivate")}
-                    className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors font-medium"
-                    disabled={actionLoading}
-                  >
-                    {selectedMember.accountStatus === "approved"
-                      ? "Deactivate"
-                      : "Activate"}
-                  </button>
-                  <button
-                    onClick={() => setShowConfirm("delete")}
-                    className="px-4 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200 transition-colors font-medium"
-                    disabled={actionLoading}
-                  >
-                    Delete
-                  </button>
                 </>
               )}
+
+              {modalTab === "changeRole" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Change Role</h3>
+                      <p className="text-sm text-gray-600">Assign a new admin role to {selectedMember.username}.</p>
+                    </div>
+                    <div className="text-sm">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full ${canChangeRoles() ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                        {canChangeRoles() ? "✓ Allowed" : "✗ Not allowed"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {Object.entries(roleDefinitions).map(([key, role]) => {
+                      // Hide superAdmin role option if current user is not superAdmin
+                      if (key === "superAdmin" && currentUser?.adminRole !== "superAdmin") {
+                        return null;
+                      }
+                      
+                      const Icon = role.icon;
+                      const isSelected = selectedRoleKey === (key as keyof typeof roleDefinitions);
+
+                      return (
+                        <div 
+                          key={key} 
+                          onClick={() => { if (!canChangeRoles()) return; setSelectedRoleKey(key as keyof typeof roleDefinitions); }} 
+                          className={`relative p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md ${isSelected ? `border-indigo-500 bg-gradient-to-r ${role.bgColor} ring-2 ring-indigo-200` : "border-gray-200 hover:border-gray-300 bg-white"} ${!canChangeRoles() ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className={`p-2 rounded-lg bg-gradient-to-r ${role.color} text-white`}>
+                              <Icon className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className={`font-semibold text-sm ${isSelected ? role.textColor : "text-gray-900"}`}>{role.name}</h3>
+                              <p className={`text-xs mt-1 ${isSelected ? role.textColor : "text-gray-600"}`}>{role.description}</p>
+                            </div>
+                            {isSelected && (<div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-indigo-600" /></div>)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                    <button onClick={() => setModalTab("details")} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium" disabled={actionLoading}>Cancel</button>
+                    <button onClick={handleChangeRole} className={`px-4 py-2 rounded-lg text-white font-medium ${canChangeRoles() ? "bg-indigo-600 hover:bg-indigo-700" : "bg-gray-400 cursor-not-allowed"}`} disabled={!canChangeRoles() || actionLoading}>{actionLoading ? "Saving..." : "Save Role"}</button>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {modalTab === "details" && (
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setShowMemberDetails(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                >
+                  Close
+                </button>
+                {selectedMember.accountStatus !== "deleted" && (
+                  <>
+                    {/* Hide Deactivate button based on role restrictions */}
+                    {!((currentUser?.id === selectedMember.id && currentUser?.adminRole === "superAdmin") ||
+                       (currentUser?.adminRole === "admin" && selectedMember.adminRole === "superAdmin") ||
+                       (currentUser?.id === selectedMember.id && currentUser?.adminRole === "admin")) && (
+                      <button
+                        onClick={() => setShowConfirm("deactivate")}
+                        className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors font-medium"
+                        disabled={actionLoading}
+                      >
+                        {selectedMember.accountStatus === "approved"
+                          ? "Deactivate"
+                          : "Activate"}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
         {/* Confirmation Modal */}
@@ -1597,9 +1830,23 @@ const TeamMemberPage = () => {
               </p>
             </div>
             <div className="flex space-x-3 mt-4 md:mt-0">
+              {/* <button
+                onClick={() => migrateExistingDocuments()}
+                className="flex items-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 shadow-md font-medium transition-colors"
+                title="Migrate existing admin documents to add missing profileImageUrl field"
+              >
+                <RefreshCw className="w-5 h-5 mr-2" />
+                Migrate Data
+              </button> */}
               <button
                 onClick={() => setShowRegisterForm(true)}
-                className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-indigo-700 transition-colors font-medium"
+                disabled={currentUser?.adminRole !== "superAdmin"}
+                className={`flex items-center px-4 py-2 rounded-lg shadow-md font-medium transition-colors ${
+                  currentUser?.adminRole === "superAdmin"
+                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                    : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                }`}
+                title={currentUser?.adminRole !== "superAdmin" ? "Only Super Admin can add new members" : "Add new admin member"}
               >
                 <UserPlus className="w-5 h-5 mr-2" />
                 Add Admin User
@@ -1751,7 +1998,6 @@ const TeamMemberPage = () => {
                 <option value="all">All Status</option>
                 <option value="approved">Active</option>
                 <option value="deactivated">Inactive</option>
-                <option value="deleted">Deleted</option>
               </select>
 
               <div className="flex bg-gray-100 rounded-lg p-1">
@@ -1774,16 +2020,6 @@ const TeamMemberPage = () => {
                   }`}
                 >
                   Inactive
-                </button>
-                <button
-                  onClick={() => setActiveTab("deleted")}
-                  className={`px-4 py-2 rounded-md font-medium transition-all text-sm ${
-                    activeTab === "deleted"
-                      ? "bg-white text-indigo-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  Deleted
                 </button>
               </div>
             </div>
@@ -1846,29 +2082,30 @@ const TeamMemberPage = () => {
                       key={member.id}
                       className="hover:bg-gray-50 transition-colors"
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mr-4">
-                            {member.profileImageUrl ? (
-                              <img
-                                src={member.profileImageUrl}
-                                alt={member.username}
-                                className="h-10 w-10 object-cover rounded-full"
-                              />
-                            ) : (
-                              <User className="w-5 h-5 text-indigo-600" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {member.username}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              ID: {member.id.slice(0, 8)}...
-                            </div>
-                          </div>
-                        </div>
-                      </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0 mr-3">
+                      {member.profileImageUrl ? (
+                        <img
+                          src={member.profileImageUrl}
+                          alt={member.username}
+                          className="w-10 h-10 object-cover rounded-full"
+                        />
+                      ) : (
+                        <User className="w-5 h-5 text-indigo-600" />
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {member.username}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        ID: {member.id.slice(0, 8)}...
+                      </div>
+                    </div>
+                  </div>
+                </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-700">
                           {member.email}
@@ -1887,9 +2124,6 @@ const TeamMemberPage = () => {
                           <div>
                             <div className="text-sm font-medium text-gray-900">
                               {roleDisplay.name}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {member.permissions?.length || 0} permissions
                             </div>
                           </div>
                         </div>

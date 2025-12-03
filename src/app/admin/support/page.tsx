@@ -976,13 +976,26 @@ const AdminSupportPage = () => {
                           <label className="text-sm font-medium">
                             Your Reply:
                           </label>
-                          <Textarea
-                            value={replyMessage}
-                            onChange={(e) => setReplyMessage(e.target.value)}
-                            placeholder="Type your reply here..."
-                            rows={4}
-                            disabled={sentTickets.has(selectedTicket.id)}
-                          />
+                          {selectedTicket.status === "closed" ||
+                          selectedTicket.status === "resolved" ||
+                          selectedTicket.status?.toLowerCase() === "closed" ||
+                          selectedTicket.status?.toLowerCase() === "resolved" ? (
+                            <div className="w-full p-4 bg-red-100 border-2 border-red-300 rounded-md text-center">
+                              <p className="text-sm font-semibold text-red-700">
+                                🔒 This ticket is {selectedTicket.status}. Chat has ended. No further replies can be added.
+                              </p>
+                            </div>
+                          ) : (
+                            <Textarea
+                              value={replyMessage}
+                              onChange={(e) =>
+                                setReplyMessage(e.target.value)
+                              }
+                              placeholder="Type your reply here..."
+                              rows={4}
+                              disabled={sentTickets.has(selectedTicket.id)}
+                            />
+                          )}
                           {sentTickets.has(selectedTicket.id) && (
                             <p className="text-sm text-green-600">
                               ✓ Reply has been sent to this ticket
@@ -1006,10 +1019,19 @@ const AdminSupportPage = () => {
                             disabled={
                               !replyMessage.trim() ||
                               isLoading ||
-                              sentTickets.has(selectedTicket.id)
+                              sentTickets.has(selectedTicket.id) ||
+                              selectedTicket.status === "closed" ||
+                              selectedTicket.status === "resolved" ||
+                              selectedTicket.status?.toLowerCase() === "closed" ||
+                              selectedTicket.status?.toLowerCase() === "resolved"
                             }
                           >
-                            {isLoading
+                            {selectedTicket.status === "closed" ||
+                            selectedTicket.status === "resolved" ||
+                            selectedTicket.status?.toLowerCase() === "closed" ||
+                            selectedTicket.status?.toLowerCase() === "resolved"
+                              ? "🔒 Ticket Closed"
+                              : isLoading
                               ? "Sending..."
                               : sentTickets.has(selectedTicket.id)
                               ? "Reply Sent"
