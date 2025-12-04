@@ -138,13 +138,13 @@ const navigationItems = [
     description: "Monitor system and user activity logs",
     allowedRoles: ["superAdmin", "admin", "support", "manageUsers"],
   },
-  {
-    name: "Settings",
-    href: "/admin/settings",
-    icon: MdOutlineManageAccounts,
-    description: "Manage your admin profile and settings",
-    allowedRoles: ["superAdmin", "admin", "support", "manageUsers", "financialViewer", "contentManager"],
-  }
+  // {
+  //   name: "Settings",
+  //   href: "/admin/settings",
+  //   icon: MdOutlineManageAccounts,
+  //   description: "Manage your admin profile and settings",
+  //   allowedRoles: ["superAdmin", "admin", "support", "manageUsers", "financialViewer", "contentManager"],
+  // }
 ];
 
 

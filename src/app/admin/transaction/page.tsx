@@ -535,7 +535,7 @@ export default function AdminTransactionsPage() {
                 Export
               </Button>
               <Button
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200"
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-50"
                 onClick={() => setShowFilters(true)}
               >
                 <Filter className="w-4 h-4 mr-2" />
@@ -548,7 +548,7 @@ export default function AdminTransactionsPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed z-50 inset-0 overflow-y-auto"
+                    className="fixed z-50 inset-0 overflow-y-auto "
                   >
                     <div
                       className="fixed inset-0 bg-black/60 backdrop-blur-sm"

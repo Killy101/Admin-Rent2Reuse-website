@@ -9,15 +9,21 @@ import Image from "next/image";
 
 import { ReactNode } from "react";
 import SessionTimeoutProvider from "@/components/sessionTimeoutProvider";
+import { useSettingsStore } from "@/app/store/useSettingStore";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, loading] = useAuthState(auth);
   const [isClient, setIsClient] = useState(false);
+    const loadSettings = useSettingsStore((s) => s.loadSettings);
 
   useEffect(() => {
     setIsClient(true);
+  }, []);
+
+   useEffect(() => {
+    loadSettings(); // Load once when app starts
   }, []);
 
   useEffect(() => {

@@ -31,6 +31,10 @@ export default function AnnouncementsPage() {
   }>({});
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingAnnouncementData, setPendingAnnouncementData] = useState<any>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteAnnouncementId, setDeleteAnnouncementId] = useState<string | null>(null);
+  const [showStatusConfirm, setShowStatusConfirm] = useState(false);
+  const [statusChangeData, setStatusChangeData] = useState<{ id: string; newStatus: boolean } | null>(null);
 
   // Real-time fetch with ordering
   useEffect(() => {
@@ -148,15 +152,53 @@ export default function AnnouncementsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteDoc(doc(db, "announcements", id));
-    if (editingId === id) resetForm();
+    setDeleteAnnouncementId(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteAnnouncementId) {
+      try {
+        await deleteDoc(doc(db, "announcements", deleteAnnouncementId));
+        if (editingId === deleteAnnouncementId) resetForm();
+        setShowDeleteConfirm(false);
+        setDeleteAnnouncementId(null);
+      } catch (error) {
+        console.log("Error deleting announcement:", error);
+        alert("Error deleting announcement");
+      }
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setDeleteAnnouncementId(null);
   };
 
   const toggleStatus = async (id: string, active: boolean) => {
-    const ref = doc(db, "announcements", id);
-    await updateDoc(ref, {
-      isActive: active,
-    });
+    setStatusChangeData({ id, newStatus: active });
+    setShowStatusConfirm(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (statusChangeData) {
+      try {
+        const ref = doc(db, "announcements", statusChangeData.id);
+        await updateDoc(ref, {
+          isActive: statusChangeData.newStatus,
+        });
+        setShowStatusConfirm(false);
+        setStatusChangeData(null);
+      } catch (error) {
+        console.log("Error updating announcement status:", error);
+        alert("Error updating announcement status");
+      }
+    }
+  };
+
+  const cancelStatusChange = () => {
+    setShowStatusConfirm(false);
+    setStatusChangeData(null);
   };
 
   const toggleMessage = (id: string) => {
@@ -531,6 +573,96 @@ export default function AnnouncementsPage() {
                 className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-md hover:from-purple-700 hover:to-blue-700 font-medium transition-colors"
               >
                 Yes, {editingId ? "Update" : "Add"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-auto"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Delete Announcement</h3>
+              <button
+                onClick={cancelDelete}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700">
+                Are you sure you want to delete this announcement? This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={cancelDelete}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+              >
+                No, Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium transition-colors"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Status Change Confirmation Modal */}
+      {showStatusConfirm && statusChangeData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-auto"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">
+                {statusChangeData.newStatus ? "Activate" : "Deactivate"} Announcement
+              </h3>
+              <button
+                onClick={cancelStatusChange}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700">
+                Are you sure you want to {statusChangeData.newStatus ? "activate" : "deactivate"} this announcement?
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={cancelStatusChange}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+              >
+                No, Cancel
+              </button>
+              <button
+                onClick={confirmStatusChange}
+                className={`flex-1 px-4 py-2 text-white rounded-md font-medium transition-colors ${
+                  statusChangeData.newStatus
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-yellow-600 hover:bg-yellow-700"
+                }`}
+              >
+                Yes, {statusChangeData.newStatus ? "Activate" : "Deactivate"}
               </button>
             </div>
           </motion.div>

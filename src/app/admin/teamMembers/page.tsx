@@ -861,13 +861,37 @@ const TeamMemberPage = () => {
 
     try {
       // Only superAdmin can add new members
-      if (currentUser?.adminRole !== "superAdmin") {
+      if (currentUser?.adminRole !== "superAdmin" && currentUser?.adminRole !== "admin") {
         showNotification(
-          "Only Super Admin users can add new admin members",
+          "Only Super Admin and Admin users can add new team members",
           "error"
         );
         setActionLoading((prev) => ({ ...prev, register: null }));
         return;
+      }
+
+      // Validate role creation permissions
+      if (currentUser?.adminRole === "superAdmin") {
+        // SuperAdmin can only create admin users
+        if (formData.adminRole !== "admin") {
+          showNotification(
+            "Super Admin can only create Admin users",
+            "error"
+          );
+          setActionLoading((prev) => ({ ...prev, register: null }));
+          return;
+        }
+      } else if (currentUser?.adminRole === "admin") {
+        // Admin can only create support, manageUsers, financialViewer, contentManager
+        const allowedRoles = ["support", "manageUsers", "financialViewer", "contentManager"];
+        if (!allowedRoles.includes(formData.adminRole)) {
+          showNotification(
+            "Admin can only create Support, User Manager, Financial Viewer, or Content Manager roles",
+            "error"
+          );
+          setActionLoading((prev) => ({ ...prev, register: null }));
+          return;
+        }
       }
 
       const currentAuthUser = auth.currentUser;
@@ -1123,7 +1147,18 @@ const TeamMemberPage = () => {
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {Object.entries(roleDefinitions)
-                    .filter(([key]) => key !== "superAdmin") // Hide superAdmin
+                    .filter(([key]) => {
+                      // SuperAdmin can only create admin users
+                      if (currentUser?.adminRole === "superAdmin") {
+                        return key === "admin";
+                      }
+                      // Admin can create support, manageUsers, financialViewer, contentManager
+                      if (currentUser?.adminRole === "admin") {
+                        return ["support", "manageUsers", "financialViewer", "contentManager"].includes(key);
+                      }
+                      // Other roles cannot create users
+                      return false;
+                    })
                     .map(([key, role]) => {
                       const IconComponent = role.icon;
                       const isSelected = formData.adminRole === key;
@@ -1439,8 +1474,12 @@ const TeamMemberPage = () => {
                   >
                     Details
                   </button>
-                  {/* Hide Change Role tab if selected member is superAdmin and current user is not superAdmin */}
-                  {!(selectedMember.adminRole === "superAdmin" && currentUser?.adminRole !== "superAdmin") && (
+                  {/* Hide Change Role tab if:
+                      1. Selected member is superAdmin and current user is not superAdmin
+                      2. Current user is superAdmin and selected member is already an admin
+                  */}
+                  {!(selectedMember.adminRole === "superAdmin" && currentUser?.adminRole !== "superAdmin") &&
+                    !(currentUser?.adminRole === "superAdmin" && selectedMember.adminRole === "admin") && (
                     <button 
                       onClick={() => setModalTab("changeRole")} 
                       disabled={!canChangeRoles()}
@@ -1510,6 +1549,16 @@ const TeamMemberPage = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Message for superAdmin viewing admin user */}
+                    {currentUser?.adminRole === "superAdmin" && selectedMember.adminRole === "admin" && (
+                      <div className="md:col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold text-blue-900">Admin Role</p>
+                          <p className="text-sm text-blue-800 mt-1">This user is already assigned the Admin role. Role changes are not available for existing admin users.</p>
+                        </div>
+                      </div>
+                    )}
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
                     Contact Information
@@ -1633,8 +1682,20 @@ const TeamMemberPage = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {Object.entries(roleDefinitions).map(([key, role]) => {
-                      // Hide superAdmin role option if current user is not superAdmin
-                      if (key === "superAdmin" && currentUser?.adminRole !== "superAdmin") {
+                      // SuperAdmin can only see and assign Admin role
+                      if (currentUser?.adminRole === "superAdmin") {
+                        if (key !== "admin") {
+                          return null;
+                        }
+                      }
+                      // Admin can see all roles except Admin
+                      else if (currentUser?.adminRole === "admin") {
+                        if (key === "admin" || key === "superAdmin") {
+                          return null;
+                        }
+                      }
+                      // Other roles cannot change roles
+                      else {
                         return null;
                       }
                       
@@ -1838,19 +1899,19 @@ const TeamMemberPage = () => {
                 <RefreshCw className="w-5 h-5 mr-2" />
                 Migrate Data
               </button> */}
-              <button
+                <button
                 onClick={() => setShowRegisterForm(true)}
-                disabled={currentUser?.adminRole !== "superAdmin"}
+                disabled={currentUser?.adminRole !== "superAdmin" && currentUser?.adminRole !== "admin"}
                 className={`flex items-center px-4 py-2 rounded-lg shadow-md font-medium transition-colors ${
-                  currentUser?.adminRole === "superAdmin"
-                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                    : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                  currentUser?.adminRole === "superAdmin" || currentUser?.adminRole === "admin"
+                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                  : "bg-gray-300 text-gray-600 cursor-not-allowed"
                 }`}
-                title={currentUser?.adminRole !== "superAdmin" ? "Only Super Admin can add new members" : "Add new admin member"}
-              >
+                title={currentUser?.adminRole === "superAdmin" || currentUser?.adminRole === "admin" ? "Add new admin member" : "Only Super Admin and Admin can add new members"}
+                >
                 <UserPlus className="w-5 h-5 mr-2" />
                 Add Admin User
-              </button>
+                </button>
             </div>
           </div>
 
