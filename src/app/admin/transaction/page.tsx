@@ -254,8 +254,14 @@ export default function AdminTransactionsPage() {
 
         const querySnapshot = await getDocs(collection(db, "transactions"));
         const data: Transaction[] = await Promise.all(
-          querySnapshot.docs.map(async (docSnap, index) => {
-            const data = docSnap.data();
+          querySnapshot.docs
+            .filter((doc) => {
+              const txnData = doc.data();
+              // Exclude rental_payment type (user-to-user payments)
+              return txnData.type !== "rental_payment";
+            })
+            .map(async (docSnap, index) => {
+              const data = docSnap.data();
             let subscriptionData = null;
             let endDate = data.endDate || null;
             let planDuration: string | undefined = undefined;

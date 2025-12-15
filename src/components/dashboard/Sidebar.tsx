@@ -67,7 +67,16 @@ const sidebarStyles = {
 };
 
 // Navigation items array - Updated with better naming
-const navigationItems = [
+interface NavItem {
+  name: string;
+  href?: string;
+  icon: any;
+  description: string;
+  allowedRoles: AdminRole[];
+  children?: NavItem[];
+}
+
+const navigationItems: NavItem[] = [
   {
     name: "Dashboard",
     href: "/admin",
@@ -98,10 +107,25 @@ const navigationItems = [
   },
   {
     name: "Payments",
-    href: "/admin/transaction",
     icon: MdOutlinePayment,
-    description: "View and track payment transactions",
+    description: "Payment related transactions",
     allowedRoles: ["superAdmin", "admin", "financialViewer"],
+    children: [
+      {
+        name: "Payment Transactions",
+        href: "/admin/transaction",
+        icon: MdOutlinePayment,
+        description: "View and track payment transactions",
+        allowedRoles: ["superAdmin", "admin", "financialViewer"],
+      },
+      {
+        name: "User-to-User Payments",
+        href: "/admin/userToUser",
+        icon: MdOutlinePayment,
+        description: "Manage user-to-user rental payments",
+        allowedRoles: ["superAdmin", "admin", "financialViewer"],
+      },
+    ],
   },
   {
     name: "Subscriptions",
@@ -110,6 +134,7 @@ const navigationItems = [
     description: "View and manage subscription plans",
     allowedRoles: ["superAdmin", "admin", "financialViewer"],
   },
+ 
   {
     name: "Support",
     href: "/admin/support",
@@ -138,13 +163,13 @@ const navigationItems = [
     description: "Monitor system and user activity logs",
     allowedRoles: ["superAdmin", "admin", "support", "manageUsers"],
   },
-  // {
-  //   name: "Settings",
-  //   href: "/admin/settings",
-  //   icon: MdOutlineManageAccounts,
-  //   description: "Manage your admin profile and settings",
-  //   allowedRoles: ["superAdmin", "admin", "support", "manageUsers", "financialViewer", "contentManager"],
-  // }
+  {
+    name: "Chat Logs",
+    href: "/admin/chatLogs",  
+    icon: MdCircleNotifications,
+    description: "Review chat interactions and logs",
+    allowedRoles: ["superAdmin", "admin", "manageUsers"],
+  }
 ];
 
 
@@ -176,6 +201,7 @@ const roleAccess: Record<AdminRole, string[]> = {
     "/admin/itemList",
     "/admin/userLog",
     "/admin/profile",
+    "/admin/chatLogs",
   ],
   financialViewer: [
     "/admin",
@@ -206,7 +232,7 @@ const hasAccess = (adminRole: AdminRole | null, path: string): boolean => {
 };
 
 // Filter navigation items based on role
-const getFilteredNavigationItems = (adminRole: AdminRole | null) => {
+const getFilteredNavigationItems = (adminRole: AdminRole | null): NavItem[] => {
   if (!adminRole) return [];
 
   const allowedPaths = roleAccess[adminRole];
@@ -217,9 +243,31 @@ const getFilteredNavigationItems = (adminRole: AdminRole | null) => {
 
   // Filter by allowedRoles and path access
   return navigationItems.filter((item) => {
-    if (!item.href) return false;
     const roleAllowed = item.allowedRoles?.includes(adminRole) ?? true;
+    
+    // For items with children (dropdowns), check if role has access to parent
+    if (item.children && item.children.length > 0) {
+      // Show dropdown if role is allowed and has access to any child
+      return roleAllowed && item.children.some((child) =>
+        hasAccess(adminRole, child.href || "")
+      );
+    }
+    
+    // For regular items, check href access
+    if (!item.href) return false;
     return roleAllowed && hasAccess(adminRole, item.href);
+  }).map((item) => {
+    // Filter children based on role access
+    if (item.children && item.children.length > 0) {
+      return {
+        ...item,
+        children: item.children.filter((child) => {
+          const roleAllowed = child.allowedRoles?.includes(adminRole) ?? true;
+          return roleAllowed && hasAccess(adminRole, child.href || "");
+        }),
+      };
+    }
+    return item;
   });
 };
 
@@ -266,6 +314,7 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
   const [mounted, setMounted] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [notificationCounts, setNotificationCounts] = useState<Record<string, number>>({});
+  const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
 
   const pathname = usePathname();
 
@@ -573,6 +622,19 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
     };
   }, [user]);
 
+  // Toggle dropdown state
+  const toggleDropdown = (name: string) => {
+    setOpenDropdowns((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(name)) {
+        newSet.delete(name);
+      } else {
+        newSet.add(name);
+      }
+      return newSet;
+    });
+  };
+
   // Check if route is active
   const isActive = useCallback(
     (href: string | undefined) => {
@@ -799,32 +861,108 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
         <nav className={sidebarStyles.nav}>
           <div className="flex flex-col gap-1">
             {getFilteredNavigationItems(adminRole).map((item) => {
-              // Regular navigation items
+              const hasChildren = item.children && item.children.length > 0;
+              const isDropdownOpen = openDropdowns.has(item.name);
               const itemIsActive = isActive(item.href);
-              const notificationCount = notificationCounts[item.href?.split("/").pop() || ""] || 0;
 
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href || "#"}
-                  className={cn(
-                    sidebarStyles.navItem,
-                    itemIsActive
-                      ? sidebarStyles.activeNavItem
-                      : sidebarStyles.inactiveNavItem
-                  )}
-                  aria-label={item.description}
-                >
-                  <item.icon className={cn(sidebarStyles.icon, "mr-3")} />
-                  <span className="font-medium">{item.name}</span>
-                  {notificationCount > 0 && (
-                    <NotificationBadge count={notificationCount} />
-                  )}
-                  {itemIsActive && (
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-l-full shadow-sm" />
-                  )}
-                </Link>
-              );
+              if (hasChildren) {
+                // Render dropdown item
+                const childIsActive = item.children?.some((child) =>
+                  isActive(child.href)
+                ) || false;
+
+                return (
+                  <div key={item.name}>
+                    <button
+                      onClick={() => toggleDropdown(item.name)}
+                      className={cn(
+                        sidebarStyles.navItem,
+                        "justify-between w-full",
+                        childIsActive
+                          ? sidebarStyles.activeNavItem
+                          : sidebarStyles.inactiveNavItem
+                      )}
+                      aria-label={item.description}
+                    >
+                      <div className="flex items-center">
+                        <item.icon className={cn(sidebarStyles.icon, "mr-3")} />
+                        <span className="font-medium">{item.name}</span>
+                      </div>
+                      <ChevronDown
+                        className={cn(
+                          "w-4 h-4 transition-transform duration-300",
+                          isDropdownOpen && "rotate-180"
+                        )}
+                      />
+                    </button>
+
+                    {/* Dropdown children */}
+                    <div
+                      className={cn(
+                        "overflow-hidden transition-all duration-300 ease-in-out",
+                        isDropdownOpen ? "max-h-96" : "max-h-0"
+                      )}
+                    >
+                      <div className="pl-4 py-2 space-y-1">
+                        {item.children?.map((child) => {
+                          const childIsActive = isActive(child.href);
+                          return (
+                            <Link
+                              key={child.name}
+                              href={child.href || "#"}
+                              className={cn(
+                                sidebarStyles.navItem,
+                                "ml-2",
+                                childIsActive
+                                  ? sidebarStyles.activeNavItem
+                                  : sidebarStyles.inactiveNavItem
+                              )}
+                              aria-label={child.description}
+                            >
+                              <child.icon
+                                className={cn(sidebarStyles.icon, "mr-3")}
+                              />
+                              <span className="font-medium text-sm">
+                                {child.name}
+                              </span>
+                              {childIsActive && (
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-l-full shadow-sm" />
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              } else {
+                // Render regular item
+                const notificationCount =
+                  notificationCounts[item.href?.split("/").pop() || ""] || 0;
+
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href || "#"}
+                    className={cn(
+                      sidebarStyles.navItem,
+                      itemIsActive
+                        ? sidebarStyles.activeNavItem
+                        : sidebarStyles.inactiveNavItem
+                    )}
+                    aria-label={item.description}
+                  >
+                    <item.icon className={cn(sidebarStyles.icon, "mr-3")} />
+                    <span className="font-medium">{item.name}</span>
+                    {notificationCount > 0 && (
+                      <NotificationBadge count={notificationCount} />
+                    )}
+                    {itemIsActive && (
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-l-full shadow-sm" />
+                    )}
+                  </Link>
+                );
+              }
             })}
           </div>
         </nav>
