@@ -2817,7 +2817,7 @@ export default function EnhancedUsersPage() {
                           <option value="Free">Free</option>
                           <option value="Basic">Basic</option>
                           <option value="Premium">Premium</option>
-                          <option value="Limited-Time-Offer">Limited-Time-Offer</option>
+                          <option value="Limited-Time-Offer">Limited-Time-Offer</option> 
                         </select>
                       </div>
 

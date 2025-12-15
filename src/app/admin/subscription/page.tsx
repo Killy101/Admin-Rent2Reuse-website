@@ -922,7 +922,7 @@ export default function PlansManagementPage() {
                     transition={{ delay: 0.1 }}
                   >
                     <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center">
-                      <DollarSign className="w-4 h-4 mr-2" />
+                      
                       Price (₱)*
                     </label>
                     <div className="relative">

@@ -307,11 +307,18 @@ export default function DashboardPage() {
         ),
       ]);
 
-      // Process transactions
-      const transactionsData = transactionsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Transaction[];
+      // Process transactions - exclude rental_payment type with completed status
+      const transactionsData = transactionsSnapshot.docs
+        .filter((doc) => {
+          const txnData = doc.data();
+          // Exclude if type is "rental_payment" AND status is "completed"
+          // (user-to-user rental payments have type: "rental_payment" and status: "completed")
+          return !(txnData.type === "rental_payment" && txnData.status === "completed");
+        })
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Transaction[];
 
       // Process support tickets
       const tickets = supportSnapshot.docs.map((doc) => {
@@ -775,10 +782,16 @@ export default function DashboardPage() {
         const transactionsSnapshot = await getDocs(
           collection(db, "transactions")
         );
-        const transactionsData = transactionsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Transaction[];
+        const transactionsData = transactionsSnapshot.docs
+          .filter((doc) => {
+            const txnData = doc.data();
+            // Exclude if type is "rental_payment" AND status is "completed"
+            return !(txnData.type === "rental_payment" && txnData.status === "completed");
+          })
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as Transaction[];
 
         // Fetch users
         const usersSnapshot = await getDocs(collection(db, "users"));
@@ -1450,8 +1463,6 @@ export default function DashboardPage() {
                       </p>
                       <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                         <span className="truncate">{ticket.userId}</span>
-                        <span>•</span>
-                        <span>{formatTimestamp(ticket.createdAt)}</span>
                       </div>
                     </div>
                   </motion.div>

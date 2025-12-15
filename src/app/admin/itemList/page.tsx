@@ -38,7 +38,7 @@ import {
   PhilippinePeso,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calendar, Clock, MapPin, Star } from "lucide-react";
+import { Calendar, Clock, MapPin, Star, User, Mail, Phone } from "lucide-react";
 
 const TOOL_CATEGORIES = [
   "Power Tools & Hand Tools",
@@ -78,6 +78,25 @@ type Item = {
   itemStatus: string;
 };
 
+type Rental = {
+  id: string;
+  itemId: string;
+  renterID: string;
+  startDate: { seconds: number; nanoseconds: number };
+  endDate?: { seconds: number; nanoseconds: number };
+  totalAmount: number;
+  status: string;
+};
+
+type RenterUser = {
+  id: string;
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  profileImage?: string;
+};
+
 const ItemListPage: React.FC = () => {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +107,7 @@ const ItemListPage: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [rentalStatusFilter, setRentalStatusFilter] = useState<"all" | "rented" | "available">("all");
 
   // Helper function to get location display text
   const getLocationText = (
@@ -144,10 +164,17 @@ const ItemListPage: React.FC = () => {
         selectedCategories.length === 0 ||
         (item.itemCategory && selectedCategories.includes(item.itemCategory));
 
-      return matchesSearch && matchesCategory;
+      const matchesRentalStatus =
+        rentalStatusFilter === "all" ||
+        (rentalStatusFilter === "rented" &&
+          item.itemStatus?.toLowerCase() === "rented") ||
+        (rentalStatusFilter === "available" &&
+          item.itemStatus?.toLowerCase() === "available");
+
+      return matchesSearch && matchesCategory && matchesRentalStatus;
     });
     setFilteredItems(filtered);
-  }, [search, items, selectedCategories]);
+  }, [search, items, selectedCategories, rentalStatusFilter]);
 
   const exportToCSV = () => {
     const headers = [
@@ -341,14 +368,14 @@ const ItemListPage: React.FC = () => {
           className="bg-white/80 backdrop-blur-sm p-6 rounded-3xl shadow-xl border border-white/20 mb-8"
         >
           <div className="flex flex-col lg:flex-row gap-4 items-center">
-            <div className=" flex-1 flex-row">
+            <div className="flex-1 relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
               <Input
                 placeholder="Search items by name or description..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-12 pr-4 py-3 text-lg h-12 border-2 border-gray-200 rounded-2xl focus:border-blue-500 focus:ring-0 bg-white/50 backdrop-blur-sm transition-all duration-300"
               />
-              <Search className="w-5 h-5 flex text-gray-400 absolute left-10 bottom-10" />
             </div>
 
             <div className="flex gap-3">
@@ -470,6 +497,56 @@ const ItemListPage: React.FC = () => {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Rental Status Filter */}
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            transition={{ delay: 0.05 }}
+            className="mt-4 pt-4 border-t border-gray-200"
+          >
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-sm text-gray-600 font-medium">
+                Rental Status:
+              </span>
+              <Button
+                variant={rentalStatusFilter === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setRentalStatusFilter("all")}
+                className={`rounded-full px-4 py-2 transition-all duration-300 ${
+                  rentalStatusFilter === "all"
+                    ? "bg-blue-500 text-white hover:bg-blue-600"
+                    : "border-gray-300 text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                All Items
+              </Button>
+              <Button
+                variant={rentalStatusFilter === "available" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setRentalStatusFilter("available")}
+                className={`rounded-full px-4 py-2 transition-all duration-300 ${
+                  rentalStatusFilter === "available"
+                    ? "bg-green-500 text-white hover:bg-green-600"
+                    : "border-gray-300 text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                Available
+              </Button>
+              <Button
+                variant={rentalStatusFilter === "rented" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setRentalStatusFilter("rented")}
+                className={`rounded-full px-4 py-2 transition-all duration-300 ${
+                  rentalStatusFilter === "rented"
+                    ? "bg-orange-500 text-white hover:bg-orange-600"
+                    : "border-gray-300 text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                Rented
+              </Button>
+            </div>
+          </motion.div>
         </motion.div>
 
         {/* Items display */}
@@ -735,6 +812,9 @@ const ItemDetailsModal = ({
   onClose: () => void;
 }) => {
   const [activeImage, setActiveImage] = useState(0);
+  const [rentalInfo, setRentalInfo] = useState<Rental | null>(null);
+  const [renterUser, setRenterUser] = useState<RenterUser | null>(null);
+  const [loadingRental, setLoadingRental] = useState(false);
 
   // Helper function to get location display text
   const getLocationText = (
@@ -762,6 +842,87 @@ const ItemDetailsModal = ({
     }
     return null;
   };
+
+  // Fetch rental information if item is rented
+  useEffect(() => {
+    const fetchRentalInfo = async () => {
+      if (!item || item.itemStatus?.toLowerCase() !== "rented") {
+        setRentalInfo(null);
+        setRenterUser(null);
+        return;
+      }
+
+      setLoadingRental(true);
+      try {
+        const rentalQuery = query(
+          collection(db, "rentals"),
+          orderBy("createdAt", "desc")
+        );
+        const rentalDocs = await getDocs(rentalQuery);
+        const rentals = rentalDocs.docs
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              renterID: data.renterID || data.renterId || "", // Handle both field name variations
+            } as Rental;
+          })
+          .filter((rental) => rental.itemId === item.id);
+
+        if (rentals.length > 0) {
+          console.log("Rental fetched:", rentals[0]); // Debug log
+          setRentalInfo(rentals[0]); // Get the most recent rental
+        } else {
+          setRentalInfo(null);
+          setRenterUser(null);
+        }
+      } catch (error) {
+        console.log("Error fetching rental info:", error);
+        setRentalInfo(null);
+        setRenterUser(null);
+      } finally {
+        setLoadingRental(false);
+      }
+    };
+
+    fetchRentalInfo();
+  }, [item]);
+
+  // Fetch renter user information when rental info is available
+  useEffect(() => {
+    const fetchRenterUser = async () => {
+      if (!rentalInfo || !rentalInfo.renterID) {
+        setRenterUser(null);
+        return;
+      }
+
+      try {
+        const usersCollection = collection(db, "users");
+        const userDocs = await getDocs(usersCollection);
+        const user = userDocs.docs.find((doc) => doc.id === rentalInfo.renterID);
+
+        if (user) {
+          const userData = user.data();
+          setRenterUser({
+            id: user.id,
+            fullName: userData.fullName || userData.displayName || "N/A",
+            email: userData.email || "N/A",
+            phone: userData.phone || "N/A",
+            address: userData.address || "N/A",
+            profileImage: userData.profileImage || userData.photoURL,
+          });
+        } else {
+          setRenterUser(null);
+        }
+      } catch (error) {
+        console.log("Error fetching renter user:", error);
+        setRenterUser(null);
+      }
+    };
+
+    fetchRenterUser();
+  }, [rentalInfo]);
 
   useEffect(() => {
     if (item?.images) {
@@ -1024,6 +1185,191 @@ const ItemDetailsModal = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Rental Information Section - Only shows if item is rented */}
+                {item.itemStatus?.toLowerCase() === "rented" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="bg-gradient-to-r from-orange-50 to-red-50 rounded-2xl p-6 shadow-md border border-orange-100 hover:shadow-lg transition-all duration-300"
+                  >
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl shadow-lg">
+                        <Package className="w-6 h-6 text-white" />
+                      </div>
+                      <h3 className="text-lg font-bold text-orange-900">
+                        Current Rental Information
+                      </h3>
+                    </div>
+
+                    {loadingRental ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                        <span className="ml-2 text-orange-700">
+                          Loading rental details...
+                        </span>
+                      </div>
+                    ) : rentalInfo ? (
+                      <div className="space-y-4">
+                        {/* Renter ID - Prominent display for management */}
+                        <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-5 border-2 border-orange-300">
+                          <p className="text-xs text-orange-700 font-bold mb-2 uppercase tracking-wide">
+                            Renter ID (For Management)
+                          </p>
+                          <div className="flex items-center gap-3">
+                            <code className="flex-1 text-sm font-mono font-bold text-gray-900 bg-white/60 px-4 py-2 rounded-lg break-all">
+                              {rentalInfo.renterID && rentalInfo.renterID.length > 0
+                                ? rentalInfo.renterID
+                                : "Loading..."}
+                            </code>
+                            {rentalInfo.renterID && (
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(rentalInfo.renterID);
+                                }}
+                                className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold transition-colors flex-shrink-0"
+                              >
+                                Copy
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Start Date, End Date, and Amount */}
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className="bg-white/70 rounded-xl p-4">
+                            <p className="text-xs text-orange-600 font-medium mb-1">
+                              START DATE
+                            </p>
+                            <p className="text-sm font-bold text-gray-900">
+                              {rentalInfo.startDate
+                                ? new Date(
+                                    rentalInfo.startDate.seconds * 1000
+                                  ).toLocaleDateString("en-US", {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  })
+                                : "N/A"}
+                            </p>
+                          </div>
+                          <div className="bg-white/70 rounded-xl p-4">
+                            <p className="text-xs text-orange-600 font-medium mb-1">
+                              END DATE (Expected Return)
+                            </p>
+                            <p className="text-sm font-bold text-gray-900">
+                              {rentalInfo.endDate
+                                ? new Date(
+                                    rentalInfo.endDate.seconds * 1000
+                                  ).toLocaleDateString("en-US", {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  })
+                                : "N/A"}
+                            </p>
+                          </div>
+                          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+                            <p className="text-xs text-green-600 font-medium mb-1">
+                              TOTAL AMOUNT
+                            </p>
+                            <p className="text-lg font-bold text-green-700">
+                              ₱{rentalInfo.totalAmount}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-white/70 rounded-xl p-4 text-center">
+                        <p className="text-gray-600">
+                          No rental information found for this item.
+                        </p>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* Renter User Information Section - Shows when rental info is available */}
+                {renterUser && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                    className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-6 shadow-md border border-blue-100 hover:shadow-lg transition-all duration-300"
+                  >
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl shadow-lg">
+                        <User className="w-6 h-6 text-white" />
+                      </div>
+                      <h3 className="text-lg font-bold text-blue-900">
+                        Renter Information
+                      </h3>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Profile Image if available */}
+                      {renterUser.profileImage && (
+                        <div className="flex justify-center mb-4">
+                          <div className="relative w-20 h-20 rounded-full overflow-hidden border-4 border-blue-200 shadow-lg">
+                            <Image
+                              src={renterUser.profileImage}
+                              alt={renterUser.fullName || "Renter"}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Full Name */}
+                      <div className="bg-white/70 rounded-xl p-4">
+                        <p className="text-xs text-blue-600 font-medium mb-1">
+                          FULL NAME
+                        </p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {renterUser.fullName}
+                        </p>
+                      </div>
+
+                      {/* Email and Phone */}
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="bg-white/70 rounded-xl p-4 flex items-center gap-3">
+                          <Mail className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-blue-600 font-medium mb-1">
+                              EMAIL
+                            </p>
+                            <p className="text-sm font-semibold text-gray-900 break-words">
+                              {renterUser.email}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="bg-white/70 rounded-xl p-4 flex items-center gap-3">
+                          <Phone className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-xs text-blue-600 font-medium mb-1">
+                              PHONE
+                            </p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {renterUser.phone}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Address */}
+                      <div className="bg-white/70 rounded-xl p-4">
+                        <p className="text-xs text-blue-600 font-medium mb-1">
+                          ADDRESS
+                        </p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {renterUser.address}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </motion.div>
             </div>
           </div>

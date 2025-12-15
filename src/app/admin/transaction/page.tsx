@@ -254,8 +254,14 @@ export default function AdminTransactionsPage() {
 
         const querySnapshot = await getDocs(collection(db, "transactions"));
         const data: Transaction[] = await Promise.all(
-          querySnapshot.docs.map(async (docSnap, index) => {
-            const data = docSnap.data();
+          querySnapshot.docs
+            .filter((doc) => {
+              const txnData = doc.data();
+              // Exclude rental_payment type (user-to-user payments)
+              return txnData.type !== "rental_payment";
+            })
+            .map(async (docSnap, index) => {
+              const data = docSnap.data();
             let subscriptionData = null;
             let endDate = data.endDate || null;
             let planDuration: string | undefined = undefined;
@@ -535,7 +541,7 @@ export default function AdminTransactionsPage() {
                 Export
               </Button>
               <Button
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200"
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-50"
                 onClick={() => setShowFilters(true)}
               >
                 <Filter className="w-4 h-4 mr-2" />
@@ -548,7 +554,7 @@ export default function AdminTransactionsPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed z-50 inset-0 overflow-y-auto"
+                    className="fixed z-50 inset-0 overflow-y-auto "
                   >
                     <div
                       className="fixed inset-0 bg-black/60 backdrop-blur-sm"
