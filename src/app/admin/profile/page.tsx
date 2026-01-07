@@ -40,6 +40,7 @@ import { ArrowRight, Lock, Save, X } from "lucide-react";
 import router from "next/router";
 
 // Interface definition
+
 interface AdminProfile {
   email: string;
   adminRole: "superAdmin" | "manageUsers" | "support";
@@ -56,6 +57,7 @@ interface AdminProfile {
 }
 
 // Utility functions (moved outside component but not hooks)
+
 const createInitialAdminDocument = async (user: User) => {
   try {
     console.log("📝 Creating initial admin document for UID:", user.uid);
@@ -109,6 +111,9 @@ const createInitialAdminDocument = async (user: User) => {
 };
 
 // Fetch admin data by UID first, then by email if not found
+// Helper: fetchAdminData
+// Attempts to load admin data first by UID, and if that fails falls back to querying by email.
+// This is useful when accounts may have been created under a different UID or migrated.
 const fetchAdminData = async (uid: string, email: string | null) => {
   // Try to get by UID
   const docRef = doc(db, "admin", uid);
@@ -130,6 +135,8 @@ const fetchAdminData = async (uid: string, email: string | null) => {
   return null;
 };
 
+// Simple local style tokens to keep JSX tidy. These are tailwind utility strings
+// reused across multiple sections of the component for consistent visuals.
 const styles = {
   container:
     "min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 p-4 sm:p-6 lg:p-8",
@@ -152,7 +159,8 @@ const styles = {
 };
 
 export default function ProfilePage() {
-  // All hooks must be declared inside the component function
+  // `adminData` holds the editable profile state mirrored to/from Firestore.
+
   const [adminData, setAdminData] = useState<AdminProfile>({
     username: "",
     email: "",
@@ -168,6 +176,7 @@ export default function ProfilePage() {
     temporaryPassword: false,
   });
 
+  // `profileImage` and `previewImage` track a file selected by the user and a local preview URL.
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -179,7 +188,8 @@ export default function ProfilePage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Enhanced error handling
+  // UX helpers: showError / showSuccess
+
   const showError = (message: string) => {
     setError(message);
     setTimeout(() => setError(""), 5000);
@@ -190,7 +200,11 @@ export default function ProfilePage() {
     setTimeout(() => setSuccess(""), 5000);
   };
 
-  // Fixed: Fetch admin data with better error handling and UID tracking
+  // Auth listener & initial data load
+  // This `useEffect` subscribes to Firebase Auth state and then attempts to
+  // - load an existing admin document (by UID or email)
+  // - create an initial document if none exists
+  // - handle UID mismatches by migrating/copying and deleting the old doc
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -248,7 +262,8 @@ export default function ProfilePage() {
             adminDoc = initialData as AdminProfile;
           }
 
-          // Set the admin data
+          // If we successfully obtained an admin document (existing or newly created)
+          // map it into our `adminData` state used by the form.
           if (adminDoc) {
             setAdminData({
               uid: user.uid,
@@ -265,6 +280,7 @@ export default function ProfilePage() {
               temporaryPassword: adminDoc.temporaryPassword || false,
             });
 
+            // If the admin doc provides a profile image URL, show it as the preview
             if (adminDoc.profileImageUrl) {
               setPreviewImage(adminDoc.profileImageUrl);
             }
@@ -290,6 +306,9 @@ export default function ProfilePage() {
     return () => unsubscribe();
   }, []);
 
+  // Image selection handler
+  // Validates the selected file (size/type) and creates a local preview URL
+  // The actual upload happens later only when the user saves changes.
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -311,7 +330,8 @@ export default function ProfilePage() {
     }
   };
 
-  // Validation functions for each field
+  // Field validation rules used by validateAllFields and live validation in edit mode.
+  // Each function returns an empty string when valid or an error message when invalid.
   const validations: { [K in keyof AdminProfile]?: (value: string) => string } =
     {
       username: (value) =>
@@ -347,7 +367,9 @@ export default function ProfilePage() {
       uid: () => "",
     };
 
-  // Handle input changes with real-time validation
+  // Centralized input change handler
+  // - updates `adminData` for the changed field
+  // - runs the per-field validation when in `editMode` so errors show live
   const handleInputChange = (field: keyof AdminProfile, value: string) => {
     setAdminData((prev) => ({ ...prev, [field]: value }));
 
@@ -359,7 +381,8 @@ export default function ProfilePage() {
     }
   };
 
-  // Validate all fields before submission
+  // Full-form validation
+  // Iterates over `validations` and collects errors; returns `true` when the form is valid.
   const validateAllFields = () => {
     const newErrors: { [key: string]: string } = {};
     let hasErrors = false;
@@ -389,7 +412,13 @@ export default function ProfilePage() {
     return !hasErrors;
   };
 
-  // Fixed: Enhanced form submission with proper UID handling
+  // Form submission flow (Save profile)
+  // Steps:
+  // 1. Validate all fields
+  // 2. Determine the correct Firestore document to update (by email or UID)
+  // 3. Upload profile image to Storage (if provided)
+  // 4. Write merged data to Firestore and update the Firebase Auth profile
+  // 5. Clean up and show success / error messages
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -446,7 +475,9 @@ export default function ProfilePage() {
         }
       }
 
-      // Handle image upload if a new image is selected
+      // Image upload section:
+      // If the user selected a new file, upload it to Storage and obtain a public URL.
+      // The upload progress indicators are updated to give feedback to the user.
       let profileImageUrl = adminData.profileImageUrl;
       if (profileImage) {
         console.log("📤 Starting image upload...");
@@ -469,7 +500,8 @@ export default function ProfilePage() {
         }
       }
 
-      // Prepare update data
+      // Prepare the object we'll persist into the `admin` document.
+      // Keep the `uid` and `email` consistent with Firestore document ID and Auth user.
       const updateData = {
         uid: docRef.id, // Use the document ID consistently
         email: adminData.email,
@@ -485,7 +517,7 @@ export default function ProfilePage() {
         temporaryPassword: false,
       };
 
-      // Update the document
+      // Persist the changes to Firestore (merge updates to avoid clobbering unrelated fields)
       console.log("📝 Updating admin document:", docRef.id);
       await setDoc(docRef, updateData, { merge: true });
 
@@ -496,7 +528,9 @@ export default function ProfilePage() {
         console.log("🗑️ Removed duplicate document");
       }
 
-      // Update Auth profile
+      // Mirror important profile fields into the Firebase Auth user object so other
+      // parts of the app that rely on `auth.currentUser.displayName` / `photoURL`
+      // are up-to-date.
       console.log("👤 Updating auth profile...");
       await updateProfile(currentUser, {
         displayName: adminData.username.trim(),
@@ -523,7 +557,9 @@ export default function ProfilePage() {
     }
   };
 
-  // Function to get input class based on validation state
+  // Visual helper: returns the appropriate input CSS classes based on state
+  // - `disabled` (read-only inputs)
+  // - `editMode` + `errors[field]` shows an error style
   const getInputClass = (
     field: keyof AdminProfile,
     disabled: boolean = false
@@ -533,6 +569,7 @@ export default function ProfilePage() {
     return styles.inputBase;
   };
 
+  // While we're loading initial profile data from Firebase, show a centered loader.
   if (initialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
@@ -546,7 +583,7 @@ export default function ProfilePage() {
 
   return (
     <div className={styles.container}>
-      {/* Success Toast */}
+      {/* Success Toast - briefly shown when an operation completes successfully */}
       {success && (
         <div className={styles.successToast}>
           <div className="flex items-center gap-2">
@@ -559,7 +596,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Error Toast */}
+      {/* Error Toast - shows user-facing error messages and dismiss button */}
       {error && (
         <div className={styles.errorToast}>
           <div className="flex items-center gap-2">
@@ -572,7 +609,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Enhanced Header Section */}
+      {/* Header Section - page title and short description */}
       <div className={styles.header}>
         <div className="flex flex-col items-center text-center justify-center gap-4">
           <div className="p-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl">
@@ -590,12 +627,14 @@ export default function ProfilePage() {
       </div>
 
       <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12">
-        {/* Left Column - Profile Card */}
+        {/* Left Column - Profile Card (visual read-only summary) */}
         <div className="lg:col-span-1">
           {/* Main Profile Card */}
           <div className={`${styles.card} p-8 sticky top-20 h-fit`}>
             <div className="flex flex-col items-center">
-              {/* Enhanced Profile Image */}
+              {/* Profile Image block */}
+              {/* - Shows current previewImage or a placeholder icon
+                  - When `editMode` is enabled an upload control is exposed */}
               <div className="relative group mb-6">
                 <div className="w-[240px] h-[240px] rounded-full overflow-hidden border-4 border-white shadow-2xl group-hover:shadow-3xl transition-all duration-500 ring-4 ring-blue-100">
                   {previewImage ? (
@@ -630,7 +669,7 @@ export default function ProfilePage() {
                 />
               </div>
 
-              {/* Enhanced Profile Info */}
+              {/* Profile information summary (name / username / contact details) */}
               <h2 className="text-2xl font-bold text-gray-900 mb-1 text-center break-words">
                 {adminData.firstName && adminData.lastName
                   ? `${adminData.firstName} ${adminData.lastName}`
@@ -639,7 +678,7 @@ export default function ProfilePage() {
               <p className="text-sm text-gray-600 text-center break-words mb-4">
                 @{adminData.username}
               </p>
-              
+
               <div className="w-full space-y-3 mb-6">
                 <div className="flex items-center gap-3 text-sm text-gray-600">
                   <Mail className="w-4 h-4 text-blue-500 flex-shrink-0" />
@@ -659,27 +698,29 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* Role Badge */}
-              <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-4 border ${
-                adminData.adminRole === "superAdmin"
-                  ? "bg-purple-100 text-purple-800 border-purple-200"
-                  : adminData.adminRole === "manageUsers"
-                  ? "bg-blue-100 text-blue-800 border-blue-200"
-                  : adminData.adminRole === "support"
-                  ? "bg-green-100 text-green-800 border-green-200"
-                  : "bg-gray-100 text-gray-800 border-gray-200"
-              }`}>
+              {/* Role Badge - visually indicates the admin role */}
+              <div
+                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-4 border ${
+                  adminData.adminRole === "superAdmin"
+                    ? "bg-purple-100 text-purple-800 border-purple-200"
+                    : adminData.adminRole === "manageUsers"
+                    ? "bg-blue-100 text-blue-800 border-blue-200"
+                    : adminData.adminRole === "support"
+                    ? "bg-green-100 text-green-800 border-green-200"
+                    : "bg-gray-100 text-gray-800 border-gray-200"
+                }`}
+              >
                 <Shield className="w-4 h-4 mr-1.5" />
                 {adminData.adminRole || "No Role"}
               </div>
 
-              {/* Enhanced Status Badge */}
+              {/* Status Badge - simple online indicator (UI only) */}
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 text-xs font-semibold mb-4 border border-green-200">
                 <div className="w-2.5 h-2.5 rounded-full bg-green-500 mr-2 animate-pulse" />
                 Online & Active
               </div>
 
-              {/* First Login Alert */}
+              {/* First Login Alert - prompts first-time users to complete their profile */}
               {adminData.isFirstLogin && (
                 <div className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-orange-100 text-orange-700 text-xs font-medium border border-orange-200 mb-4">
                   <AlertCircle className="w-4 h-4" />
@@ -687,10 +728,11 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* Last Updated */}
+              {/* Last Updated - displays a human friendly updatedAt date when available */}
               {adminData.updatedAt && (
                 <p className="text-gray-400 text-xs mt-4 pt-4 border-t border-gray-200 w-full text-center">
-                  Updated: {(() => {
+                  Updated:{" "}
+                  {(() => {
                     try {
                       const date = new Date(adminData.updatedAt);
                       if (isNaN(date.getTime())) {
@@ -708,9 +750,11 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Enhanced Right Column - Form */}
+        {/* Right Column - Editable form for profile fields */}
         <div className={`${styles.card} p-8`}>
           <div className="flex items-center justify-between mb-8">
+            {/* Top bar: form title and edit toggle
+                - Toggle switches `editMode` and clears errors when entering edit mode */}
             <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Edit3 className="w-6 h-6 text-blue-600" />
               Profile Information
@@ -730,8 +774,9 @@ export default function ProfilePage() {
             </button>
           </div>
 
+          {/* Main editable form - bound to `adminData` and submits through `handleSubmit` */}
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Progress Bar */}
+            {/* Optional Upload Progress Bar: visible while an image is being uploaded */}
             {loading && uploadProgress > 0 && (
               <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
                 <div
@@ -741,9 +786,9 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Form Fields */}
+            {/* Form Fields: username, email (readonly), name, role, phone, address */}
             <div className="space-y-5">
-              {/* Username Field */}
+              {/* Username Field - required and editable when `editMode` is true */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">
                   Username <span className="text-red-500">*</span>
@@ -764,7 +809,7 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* Email Field */}
+              {/* Email Field - read-only: system-managed and cannot be modified here */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">
                   Email Address
@@ -780,7 +825,7 @@ export default function ProfilePage() {
                 </p>
               </div>
 
-              {/* First & Last Name Grid */}
+              {/* First & Last Name - required fields used to display full name */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700">
@@ -827,7 +872,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Role & Phone Grid */}
+              {/* Role & Phone - role is read-only here, phone is editable */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700">
@@ -871,7 +916,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Address Field */}
+              {/* Address Field - optional, limited length */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">
                   Address
@@ -890,7 +935,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Security Section */}
+            {/* Security Section - quick link to change password (navigates to auth page) */}
             <div className="border-t-2 border-gray-200 pt-6">
               <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <Lock className="w-5 h-5 text-blue-600" />
@@ -910,13 +955,15 @@ export default function ProfilePage() {
               >
                 <div className="flex items-center gap-3">
                   <Lock className="w-4 h-4 text-blue-500 group-hover:text-blue-600" />
-                  <span className="text-gray-700 font-medium text-sm">Change Password</span>
+                  <span className="text-gray-700 font-medium text-sm">
+                    Change Password
+                  </span>
                 </div>
                 <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transform group-hover:translate-x-1 transition-all duration-300" />
               </a>
             </div>
 
-            {/* Form Actions */}
+            {/* Form Actions - Cancel and Save buttons appear only in edit mode */}
             {editMode && (
               <div className="flex justify-end gap-4 pt-8 border-t-2 border-gray-200">
                 <button

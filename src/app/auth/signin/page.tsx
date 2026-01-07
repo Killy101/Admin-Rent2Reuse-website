@@ -489,7 +489,6 @@ export default function SignInPage({ className }: SignInPageProps) {
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     </div>
                   </div>
-
                   {/* Password Field */}
                   <div className="space-y-2">
                     <Label
@@ -518,6 +517,15 @@ export default function SignInPage({ className }: SignInPageProps) {
                       Forgot password?
                     </Link>
                   </div>
+                  {/* Sign Up Link
+                  <div className="text-center">
+                    <Link
+                      href="/auth/signup"
+                      className="inline-block text-sm text-green-600 hover:text-green-700 hover:underline mt-1"
+                    >
+                      Don't have an account? Sign up
+                    </Link>
+                  </div> */}
                 </div>
 
                 {/* Error Message */}

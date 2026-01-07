@@ -1,6 +1,13 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  updateDoc,
+  doc,
+} from "firebase/firestore";
 import { db } from "@/app/firebase/config";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
@@ -822,6 +829,38 @@ const ItemDetailsModal = ({
   const [renterUser, setRenterUser] = useState<RenterUser | null>(null);
   const [loadingRental, setLoadingRental] = useState(false);
 
+  // NEW: prohibit state & saving flag
+  const [isProhibited, setIsProhibited] = useState<boolean>(
+    !!item && item.itemStatus?.toLowerCase() === "prohibited"
+  );
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setActiveImage(0);
+    setIsProhibited(!!item && item.itemStatus?.toLowerCase() === "prohibited");
+  }, [item]);
+
+  // NEW: toggle prohibit / deactivate item
+  const toggleProhibit = async () => {
+    if (!item) return;
+    setIsSaving(true);
+    try {
+      const newStatus = isProhibited ? "available" : "prohibited";
+      await updateDoc(doc(db, "items", item.id), {
+        itemStatus: newStatus,
+      });
+      setIsProhibited(!isProhibited);
+      // Optional: quick local update so UI reflects change immediately
+      // (if parent relies on re-fetch, it will still update later)
+      (item as any).itemStatus = newStatus;
+    } catch (err) {
+      console.log("Error updating item status:", err);
+      alert("Failed to update item status. See console for details.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Helper function to get location display text
   const getLocationText = (
     location:
@@ -1389,7 +1428,48 @@ const ItemDetailsModal = ({
         </ScrollArea>
 
         {/* Fixed Footer */}
-        <DialogFooter className="bg-gradient-to-r from-white/80 to-white/60 backdrop-blur-sm border-t border-white/30 rounded-b-3xl -m-6 mt-0 p-6 flex-shrink-0"></DialogFooter>
+        <DialogFooter className="bg-gradient-to-r from-white/80 to-white/60 backdrop-blur-sm border-t border-white/30 rounded-b-3xl -m-6 mt-0 p-6 flex-shrink-0 flex items-center justify-between gap-4">
+          <div className="flex-1">
+            {isProhibited ? (
+              <div className="inline-flex items-center gap-3 bg-red-50 text-red-800 px-4 py-2 rounded-xl border border-red-100">
+                <strong>Warning:</strong>
+                <span>This item is prohibited and cannot be rented.</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-3 bg-yellow-50 text-yellow-800 px-4 py-2 rounded-xl border border-yellow-100">
+                <strong>Note:</strong>
+                <span>This item is available for rent.</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="rounded-xl"
+              disabled={isSaving}
+            >
+              Close
+            </Button>
+
+            <Button
+              onClick={toggleProhibit}
+              className={`rounded-xl px-4 py-2 font-semibold ${
+                isProhibited
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : "bg-red-600 hover:bg-red-700 text-white"
+              }`}
+              disabled={isSaving}
+            >
+              {isSaving
+                ? "Saving..."
+                : isProhibited
+                ? "Reactivate Item"
+                : "Prohibit Item"}
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -776,6 +776,13 @@ export default function EnhancedUsersPage() {
     }
   };
 
+  // ---------------------------
+  // Small UI helpers
+  // These helpers return visual assets or handle image fallbacks used across the UI.
+  // - `getProfileImage`: returns a profile image path or fallback.
+  // - `handleImageError`: sets a fallback image when the image fails to load.
+  // ---------------------------
+
   const getProfileImage = (imagePath: string | undefined) => {
     return imagePath || "/profile/profile.png";
   };
@@ -786,7 +793,14 @@ export default function EnhancedUsersPage() {
     event.currentTarget.src = "/profile/profile.png";
   };
 
-  // Fetch user reports
+  // ---------------------------
+  // fetchUserReports
+  // Purpose: retrieve reports from the `reports` collection. If a `userId` is
+  // provided, the function filters reports for that specific user. To avoid
+  // extra lookups per report, all referenced user documents (reporter and
+  // reported users) are fetched in a single batch and mapped to names.
+  // Side-effects: updates `userReports` and `selectedUserReports` (when userId provided).
+  // ---------------------------
   const fetchUserReports = useCallback(async (userId?: string) => {
     try {
       const reportsRef = collection(db, "reports");
@@ -858,7 +872,14 @@ export default function EnhancedUsersPage() {
     }
   }, []);
 
-  // Enhanced fetch users function
+  // ---------------------------
+  // fetchUsers
+  // Purpose: load all user documents with role === 'user', normalize their
+  // profile and subscription data, and compute aggregate `userStats` used
+  // by the dashboard. Subscription documents are fetched when a
+  // `subscriptionId` is present and mapped into `subscriptionDates`.
+  // Side-effects: updates `users`, `subscriptionDates`, `userStats`.
+  // ---------------------------
   const fetchUsers = useCallback(async () => {
     try {
       setRefreshing(true);
@@ -965,7 +986,11 @@ export default function EnhancedUsersPage() {
     }
   }, []);
 
-  // Fetch user items
+  // ---------------------------
+  // fetchUserItems
+  // Purpose: fetch items owned by a user (from `items` collection) to show
+  // them in the user detail modal. Stores results in `userItems`.
+  // ---------------------------
   const fetchUserItems = async (userId: string) => {
     try {
       const itemsRef = collection(db, "items");
@@ -983,7 +1008,11 @@ export default function EnhancedUsersPage() {
     }
   };
 
-  // Handle view user
+  // ---------------------------
+  // handleViewUser
+  // Purpose: open the user detail modal, set the selected user, and
+  // pre-load the user's items and reports so the modal can render fast.
+  // ---------------------------
   const handleViewUser = async (user: UserData) => {
     setSelectedUser(user);
     setShowUserModal(true);
@@ -991,7 +1020,12 @@ export default function EnhancedUsersPage() {
     await fetchUserReports(user.uid);
   };
 
-  // Enhanced handleUpdateUserStatus with reason tracking
+  // ---------------------------
+  // handleUpdateUserStatusWithReason
+  // Purpose: change a user's account status and record suspension data
+  // atomically using a Firestore batch. When suspending, this function
+  // also updates related report documents and writes a suspension log.
+  // ---------------------------
   const handleUpdateUserStatusWithReason = async (
     userId: string,
     newStatus: string,
@@ -1049,7 +1083,12 @@ export default function EnhancedUsersPage() {
     }
   };
 
-  // Memoized filtered and sorted users
+  // ---------------------------
+  // filteredAndSortedUsers (derived state)
+  // Purpose: apply search, filters, and sorting to the `users` list and
+  // return the derived array used for pagination and rendering.
+  // This memoized value avoids recalculating filters on every render.
+  // ---------------------------
   const filteredAndSortedUsers = useMemo(() => {
     let filtered = users.filter((user) => {
       const searchString =
@@ -1126,7 +1165,11 @@ export default function EnhancedUsersPage() {
     return filtered;
   }, [users, searchTerm, filters, sortConfig, subscriptionDates]);
 
-  // Pagination calculations
+  // ---------------------------
+  // Pagination
+  // indexOfLastUser / indexOfFirstUser / currentUsers / totalPages
+  // Purpose: calculate slice indices for current page and expose `currentUsers`.
+  // ---------------------------
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredAndSortedUsers.slice(
@@ -1135,7 +1178,11 @@ export default function EnhancedUsersPage() {
   );
   const totalPages = Math.ceil(filteredAndSortedUsers.length / usersPerPage);
 
+  // ---------------------------
   // Event handlers
+  // These functions respond to UI events: sorting, selecting users,
+  // pagination controls and bulk action toggles.
+  // ---------------------------
   const handleSort = (column: SortConfig["key"]) => {
     setSortConfig((prev) => ({
       key: column,
@@ -1165,6 +1212,12 @@ export default function EnhancedUsersPage() {
     }
   };
 
+  // ---------------------------
+  // handleBulkAction
+  // Purpose: perform batch updates (activate, suspend, verify) for the
+  // currently selected users using a Firestore write batch for atomicity.
+  // After committing the batch, the users list is refreshed.
+  // ---------------------------
   const handleBulkAction = async (action: string) => {
     if (selectedUsers.size === 0) return;
 
@@ -1201,6 +1254,12 @@ export default function EnhancedUsersPage() {
     }
   };
 
+  // ---------------------------
+  // handleUpdateUserStatus
+  // Purpose: simple helper to update a single user's `accountStatus` field
+  // and refresh the list. Used by UI action buttons when no suspension reason
+  // needs to be recorded.
+  // ---------------------------
   const handleUpdateUserStatus = async (userId: string, newStatus: string) => {
     try {
       await updateDoc(doc(db, "users", userId), {
@@ -1212,6 +1271,11 @@ export default function EnhancedUsersPage() {
     }
   };
 
+  // ---------------------------
+  // exportToCSV
+  // Purpose: build a CSV string from the current filtered list and trigger
+  // a download in the browser. Useful for admin reporting/export.
+  // ---------------------------
   const exportToCSV = () => {
     const headers = [
       "Name",
@@ -1296,7 +1360,7 @@ export default function EnhancedUsersPage() {
           icon: FiUserCheck,
           color: "green",
         },
-         {
+        {
           label: "Limitied Time Offer",
           value: userStats.premium,
           icon: FiGift,
@@ -2209,9 +2273,11 @@ export default function EnhancedUsersPage() {
                       ([severity, details]) => {
                         const severityColors = {
                           low: "border-yellow-200 bg-yellow-50 hover:border-yellow-300",
-                          medium: "border-orange-200 bg-orange-50 hover:border-orange-300",
+                          medium:
+                            "border-orange-200 bg-orange-50 hover:border-orange-300",
                           high: "border-red-200 bg-red-50 hover:border-red-300",
-                          critical: "border-purple-200 bg-purple-50 hover:border-purple-300",
+                          critical:
+                            "border-purple-200 bg-purple-50 hover:border-purple-300",
                         };
                         const severityIcons = {
                           low: "🟡",
@@ -2241,9 +2307,11 @@ export default function EnhancedUsersPage() {
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <p className="font-semibold text-gray-900 capitalize">
-                                  {severityIcons[
-                                    severity as keyof typeof severityIcons
-                                  ]}{" "}
+                                  {
+                                    severityIcons[
+                                      severity as keyof typeof severityIcons
+                                    ]
+                                  }{" "}
                                   {severity} Severity
                                 </p>
                                 <p className="text-sm text-gray-700 mt-1">
@@ -2817,7 +2885,9 @@ export default function EnhancedUsersPage() {
                           <option value="Free">Free</option>
                           <option value="Basic">Basic</option>
                           <option value="Premium">Premium</option>
-                          <option value="Limited-Time-Offer">Limited-Time-Offer</option> 
+                          <option value="Limited-Time-Offer">
+                            Limited-Time-Offer
+                          </option>
                         </select>
                       </div>
 
@@ -2945,7 +3015,8 @@ export default function EnhancedUsersPage() {
             </div>
           </div>
 
-          {/* Content based on view mode */}
+          {/*change the color of the button to violet once it is hovered by the mouse */}
+
           {viewMode === "table" ? (
             <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
               <div className="overflow-x-auto">
@@ -3097,11 +3168,12 @@ export default function EnhancedUsersPage() {
                               </span>
                             </div>
                           </td>
+
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex items-center space-x-2">
                               <button
                                 onClick={() => handleViewUser(user)}
-                                className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-xs"
+                                className="px-3 py-1 bg-neutral-800 text-white rounded-lg hover:bg-violet-700 transition-colors font-medium text-xs"
                                 title="View Details"
                               >
                                 View Details

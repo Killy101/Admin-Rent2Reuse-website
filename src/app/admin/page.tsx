@@ -64,12 +64,18 @@ import EnhancedWeeklyPerformanceChart from "@/components/Charts/EnhancedWeeklyPe
 import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
+// ---------------------------
+// Data Interfaces
+// Define TypeScript interfaces for structured data returned from Firestore.
+// Keeping these near the top ensures consistent usage across the component.
+// ---------------------------
 // Keep interfaces and type definitions outside
 interface Transaction {
   id: string;
   transactionId: string;
   userId: string;
   amount: number;
+  type?: string;
   status: "pending" | "success" | "rejected" | "refunded" | "completed";
   createdAt: {
     seconds: number;
@@ -141,10 +147,19 @@ interface SubscriptionDates {
 }
 
 // --- Support Tickets State ---
+// ---------------------------
+// Main Component
+// `DashboardPage` is the entry point for the admin dashboard. It
+// initializes state, checks authentication, and contains the
+// primary data loading and UI rendering flows.
+// ---------------------------
 export default function DashboardPage() {
   const { isAuthenticated, loading } = useAdminAuth();
   const router = useRouter();
 
+  // Ensure only authenticated admins can access this page.
+  // If the auth context reports the admin is not authenticated (and not loading),
+  // redirect to the signin page to avoid rendering protected data.
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.replace("/auth/signin");
@@ -191,6 +206,10 @@ export default function DashboardPage() {
     // Initial state for subscription dates
   });
 
+  // ---------------------------
+  // Local UI State
+  // Track lists, charts, loading flags and notifications used by the UI.
+  // ---------------------------
   // Add notification state and functions
   const [notification, setNotification] = useState<{
     type: "success" | "error";
@@ -198,6 +217,8 @@ export default function DashboardPage() {
   } | null>(null);
 
   // Helper function to handle subscription data
+  // This extracts and maps subscription start/end dates for a user's current plan.
+  // It is called while iterating user documents to build a subscription date lookup.
   function handleSubscriptionData(
     subData: any,
     currentPlan: any,
@@ -216,206 +237,227 @@ export default function DashboardPage() {
     try {
       setRefreshing(true);
       console.log("🔄 Starting data refresh...");
+      // ---------------------------
+      // Data Refresh Flow (`handleRefresh`)
+      // This function performs the full dashboard data reload when the user
+      // clicks refresh. The flow is:
+      // 1. Set loading state and clear previous data
+      // 2. Query `users` and for each user fetch subscription details (if any)
+      // 3. Query `transactions` and `support` concurrently
+      // 4. Normalize and filter transaction/support documents
+      // 5. Generate a combined recent activity feed
+      // 6. Compute dashboard summary metrics and update state
+      // 7. Clear loading state and handle errors
+      // ---------------------------
+      const handleRefresh = async () => {
+        try {
+          setRefreshing(true);
+          console.log("🔄 Starting data refresh...");
 
-      // Clear existing data
-      setUsers([]);
-      setSubscriptionDates({});
-      setDashboardData({
-        totalUsers: 0,
-        totalRevenue: 0,
-        totalTransactions: 0,
-        successfulTransactions: 0,
-        revenueGrowth: 0,
-        lastTransactionDate: "Loading...",
-        averageTransactionValue: 0,
-        transactionsByStatus: {
-          pending: 0,
-          completed: 0,
-          rejected: 0,
-          refunded: 0,
-        },
-        weeklyTransactions: 0,
-        monthlyTransactions: 0,
-      });
-      setCompletedTransactions([]);
-      setRecentActivity([]);
+          // 1) Clear existing UI data to show fresh loading state
+          setUsers([]);
+          setSubscriptionDates({});
+          setDashboardData({
+            totalUsers: 0,
+            totalRevenue: 0,
+            totalTransactions: 0,
+            successfulTransactions: 0,
+            revenueGrowth: 0,
+            lastTransactionDate: "Loading...",
+            averageTransactionValue: 0,
+            transactionsByStatus: {
+              pending: 0,
+              completed: 0,
+              rejected: 0,
+              refunded: 0,
+            },
+            weeklyTransactions: 0,
+            monthlyTransactions: 0,
+          });
+          setCompletedTransactions([]);
+          setRecentActivity([]);
 
-      // Fetch users data
-      const q = query(collection(db, "users"), where("role", "==", "user"));
-      const snapshot = await getDocs(q);
-      const datesMap: { [key: string]: SubscriptionDates } = {};
+          // 2) Fetch users (only 'user' role) and collect subscription ids
+          const q = query(collection(db, "users"), where("role", "==", "user"));
+          const snapshot = await getDocs(q);
+          const datesMap: { [key: string]: SubscriptionDates } = {};
 
-      const userData = await Promise.all(
-        snapshot.docs.map(async (userDoc) => {
-          const d = userDoc.data();
-          console.log(`📄 Processing user: ${userDoc.id}`);
+          const userData = await Promise.all(
+            snapshot.docs.map(async (userDoc) => {
+              const d = userDoc.data();
+              console.log(`📄 Processing user: ${userDoc.id}`);
 
-          const currentPlan = {
-            planId: d.currentPlan?.planId || "",
-            planType: d.currentPlan?.planType
-              ? d.currentPlan.planType.charAt(0).toUpperCase() +
-                d.currentPlan.planType.slice(1).toLowerCase()
-              : "Free",
-            status: d.currentPlan?.status || "Inactive",
-            subscriptionId: d.currentPlan?.subscriptionId || "",
-          };
+              // Normalize current plan info for display
+              const currentPlan = {
+                planId: d.currentPlan?.planId || "",
+                planType: d.currentPlan?.planType
+                  ? d.currentPlan.planType.charAt(0).toUpperCase() +
+                    d.currentPlan.planType.slice(1).toLowerCase()
+                  : "Free",
+                status: d.currentPlan?.status || "Inactive",
+                subscriptionId: d.currentPlan?.subscriptionId || "",
+              };
 
-          // Fetch subscription data if exists
-          if (currentPlan.subscriptionId) {
-            try {
-              console.log(
-                `🔍 Fetching subscription: ${currentPlan.subscriptionId}`
-              );
-              const subscriptionDoc = await getDoc(
-                doc(db, "subscription", currentPlan.subscriptionId)
-              );
+              // 3) If there's a subscriptionId, fetch its document and store dates
+              if (currentPlan.subscriptionId) {
+                try {
+                  console.log(
+                    `🔍 Fetching subscription: ${currentPlan.subscriptionId}`
+                  );
+                  const subscriptionDoc = await getDoc(
+                    doc(db, "subscription", currentPlan.subscriptionId)
+                  );
 
-              if (subscriptionDoc.exists()) {
-                const subData = subscriptionDoc.data();
-                handleSubscriptionData(subData, currentPlan, datesMap);
+                  if (subscriptionDoc.exists()) {
+                    const subData = subscriptionDoc.data();
+                    handleSubscriptionData(subData, currentPlan, datesMap);
+                  }
+                } catch (subError) {
+                  console.log("❌ Error fetching subscription:", subError);
+                }
               }
-            } catch (subError) {
-              console.log("❌ Error fetching subscription:", subError);
-            }
-          }
 
-          // Ensure all required User fields are present
-          return {
-            id: userDoc.id,
-            email: d.email || "",
-            firstname: d.firstname || "N/A",
-            lastname: d.lastname || "N/A",
-            role: d.role || "user",
-            createdAt: d.createdAt ?? null,
-            // The following fields are not in User type, but may be used elsewhere
-            currentPlan,
-            status: currentPlan.status,
-            amount: d.amount || 0,
-          } as User;
-        })
-      );
+              // Normalize user object for UI usage
+              return {
+                id: userDoc.id,
+                email: d.email || "",
+                firstname: d.firstname || "N/A",
+                lastname: d.lastname || "N/A",
+                role: d.role || "user",
+                createdAt: d.createdAt ?? null,
+                currentPlan,
+                status: currentPlan.status,
+                amount: d.amount || 0,
+              } as User;
+            })
+          );
 
-      // Update users and subscription dates
-      setSubscriptionDates(datesMap);
-      setUsers(userData.filter((user) => user.role === "user"));
+          // Update users and subscription dates
+          setSubscriptionDates(datesMap);
+          setUsers(userData.filter((user) => user.role === "user"));
 
-      // Fetch other dashboard data
-      const [transactionsSnapshot, supportSnapshot] = await Promise.all([
-        getDocs(collection(db, "transactions")),
-        getDocs(
-          query(collection(db, "support"), orderBy("date", "desc"), limit(3))
-        ),
-      ]);
+          // 4) Fetch transactions and recent support tickets concurrently
+          const [transactionsSnapshot, supportSnapshot] = await Promise.all([
+            getDocs(collection(db, "transactions")),
+            getDocs(
+              query(
+                collection(db, "support"),
+                orderBy("date", "desc"),
+                limit(3)
+              )
+            ),
+          ]);
 
-      // Process transactions - exclude rental_payment type with completed status
-      const transactionsData = transactionsSnapshot.docs
-        .filter((doc) => {
-          const txnData = doc.data();
-          // Exclude if type is "rental_payment" AND status is "completed"
-          // (user-to-user rental payments have type: "rental_payment" and status: "completed")
-          return !(txnData.type === "rental_payment" && txnData.status === "completed");
-        })
-        .map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Transaction[];
+          // 5) Filter and normalize transactions - exclude internal rental_payment completions
+          const transactionsData = transactionsSnapshot.docs
+            .filter((doc) => {
+              const txnData = doc.data();
+              return !(
+                txnData.type === "rental_payment" &&
+                txnData.status === "completed"
+              );
+            })
+            .map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            })) as Transaction[];
 
-      // Process support tickets
-      const tickets = supportSnapshot.docs.map((doc) => {
-        const rawStatus = doc.data().status?.toLowerCase();
-        let status: "pending" | "resolved" | "open";
-        if (rawStatus === "resolved") status = "resolved";
-        else if (rawStatus === "open") status = "open";
-        else status = "pending";
-        return {
-          id: `support_${doc.id}`,
-          type: "support" as const,
-          description:
-            doc.data().description ||
-            `New support ticket: ${doc.data().subject || "Complaint"}`,
-          subject: doc.data().subject || "No subject",
-          email: doc.data().email || "Unknown user",
-          createdAt: doc.data().date || new Timestamp(0, 0),
-          status,
-          userId: doc.data().userId || "",
-        } as SupportTicket;
-      });
+          // 6) Normalize support ticket documents for UI
+          const tickets = supportSnapshot.docs.map((doc) => {
+            const rawStatus = doc.data().status?.toLowerCase();
+            let status: "pending" | "resolved" | "open";
+            if (rawStatus === "resolved") status = "resolved";
+            else if (rawStatus === "open") status = "open";
+            else status = "pending";
+            return {
+              id: `support_${doc.id}`,
+              type: "support" as const,
+              description:
+                doc.data().description ||
+                `New support ticket: ${doc.data().subject || "Complaint"}`,
+              subject: doc.data().subject || "No subject",
+              email: doc.data().email || "Unknown user",
+              createdAt: doc.data().date || new Timestamp(0, 0),
+              status,
+              userId: doc.data().userId || "",
+            } as SupportTicket;
+          });
 
-      // Generate activity data
-      const activity = await generateRecentActivity(transactionsData, userData);
+          // 7) Build recent activity feed combining transactions and users
+          const activity = await generateRecentActivity(
+            transactionsData,
+            userData
+          );
 
-      // Update all states
-      setCompletedTransactions(transactionsData);
-      setSupportTickets(tickets);
-      setRecentActivity(activity);
+          // 8) Update UI states with fetched and computed data
+          setCompletedTransactions(transactionsData);
+          setSupportTickets(tickets);
+          setRecentActivity(activity);
 
-      // Compute dashboard data directly here
-      const now = new Date();
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          // 9) Compute dashboard summary metrics (revenue, counts, averages)
+          const now = new Date();
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-      const successfulTransactions = transactionsData.filter(
-        (t) => t.status === "completed" || t.status === "success"
-      );
-      const totalRevenue = successfulTransactions.reduce(
-        (sum, t) => sum + (t.amount || 0),
-        0
-      );
-      const transactionsByStatus = {
-        pending: transactionsData.filter((t) => t.status === "pending").length,
-        completed: transactionsData.filter(
-          (t) => t.status === "completed" || t.status === "success"
-        ).length,
-        rejected: transactionsData.filter((t) => t.status === "rejected")
-          .length,
-        refunded: transactionsData.filter((t) => t.status === "refunded")
-          .length,
+          const successfulTransactions = transactionsData.filter(
+            (t) => t.status === "completed" || t.status === "success"
+          );
+          const totalRevenue = successfulTransactions.reduce(
+            (sum, t) => sum + (t.amount || 0),
+            0
+          );
+          const transactionsByStatus = {
+            pending: transactionsData.filter((t) => t.status === "pending")
+              .length,
+            completed: transactionsData.filter(
+              (t) => t.status === "completed" || t.status === "success"
+            ).length,
+            rejected: transactionsData.filter((t) => t.status === "rejected")
+              .length,
+            refunded: transactionsData.filter((t) => t.status === "refunded")
+              .length,
+          };
+          const lastTransaction = transactionsData
+            .filter((t) => isValidTimestamp(t.createdAt))
+            .sort(
+              (a, b) =>
+                b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime()
+            )[0];
+
+          setDashboardData({
+            totalUsers: userData.length,
+            totalRevenue,
+            totalTransactions: transactionsData.length,
+            successfulTransactions: successfulTransactions.length,
+            revenueGrowth: 0,
+            lastTransactionDate: lastTransaction
+              ? format(lastTransaction.createdAt.toDate(), "MMM dd, yyyy")
+              : "No transactions",
+            averageTransactionValue:
+              successfulTransactions.length > 0
+                ? totalRevenue / successfulTransactions.length
+                : 0,
+            transactionsByStatus,
+            weeklyTransactions: transactionsData.filter(
+              (t) =>
+                isValidTimestamp(t.createdAt) && t.createdAt.toDate() >= weekAgo
+            ).length,
+            monthlyTransactions: transactionsData.filter(
+              (t) =>
+                isValidTimestamp(t.createdAt) &&
+                t.createdAt.toDate() >= monthAgo
+            ).length,
+          });
+
+          setIsLoading(false);
+          setRefreshing(false);
+        } catch (err) {
+          console.error("Error refreshing dashboard:", err);
+          setError("Failed to refresh dashboard data.");
+          setIsLoading(false);
+          setRefreshing(false);
+        }
       };
-      const lastTransaction = transactionsData
-        .filter((t) => isValidTimestamp(t.createdAt))
-        .sort(
-          (a, b) =>
-            b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime()
-        )[0];
-
-      setDashboardData({
-        totalUsers: userData.length,
-        totalRevenue,
-        totalTransactions: transactionsData.length,
-        successfulTransactions: successfulTransactions.length,
-        revenueGrowth: 0,
-        lastTransactionDate: lastTransaction
-          ? format(lastTransaction.createdAt.toDate(), "MMM dd, yyyy")
-          : "No transactions",
-        averageTransactionValue:
-          successfulTransactions.length > 0
-            ? totalRevenue / successfulTransactions.length
-            : 0,
-        transactionsByStatus,
-        weeklyTransactions: transactionsData.filter(
-          (t) =>
-            isValidTimestamp(t.createdAt) && t.createdAt.toDate() >= weekAgo
-        ).length,
-        monthlyTransactions: transactionsData.filter(
-          (t) =>
-            isValidTimestamp(t.createdAt) && t.createdAt.toDate() >= monthAgo
-        ).length,
-      });
-
-      // Update chart data
-      const chartData = groupTransactionsByDate(
-        transactionsData,
-        selectedTimeRange
-      );
-      setTransactionChartData(chartData);
-
-      console.log("✅ Data refresh completed successfully");
-      setNotification({
-        type: "success",
-        message: "Data refreshed successfully!",
-      });
-    } catch (error) {
-      console.log("❌ Error refreshing data:", error);
       setNotification({
         type: "error",
         message: "Failed to refresh data. Please try again.",
@@ -585,6 +627,12 @@ export default function DashboardPage() {
   };
 
   // Generate recent activity feed from multiple sources
+  // This function synthesizes activity entries from:
+  // - recent user registrations (from `users` collection)
+  // - recent transactions (from `transactions` collection)
+  // - newly created user docs fetched directly from Firestore
+  // It normalizes timestamps, builds a compact `RecentActivity[]` and
+  // returns the most recent entries for display in the activity feed.
   const generateRecentActivity = async (
     transactions: Transaction[],
     users: User[]
@@ -786,7 +834,10 @@ export default function DashboardPage() {
           .filter((doc) => {
             const txnData = doc.data();
             // Exclude if type is "rental_payment" AND status is "completed"
-            return !(txnData.type === "rental_payment" && txnData.status === "completed");
+            return !(
+              txnData.type === "rental_payment" &&
+              txnData.status === "completed"
+            );
           })
           .map((doc) => ({
             id: doc.id,
@@ -1303,7 +1354,7 @@ export default function DashboardPage() {
           </Card>
         </motion.section>
 
-        <EnhancedWeeklyPerformanceChart 
+        <EnhancedWeeklyPerformanceChart
           completedTransactions={completedTransactions}
           selectedTimeRange={selectedTimeRange}
           setSelectedTimeRange={setSelectedTimeRange}
@@ -1356,8 +1407,6 @@ export default function DashboardPage() {
                         </p>
                         <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                           <span className="truncate">{activity.user}</span>
-                          
-                          
                         </div>
                       </div>
                     </motion.div>

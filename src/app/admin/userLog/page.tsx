@@ -53,44 +53,48 @@ const UserLogsPage = () => {
   const itemsPerPage = 10;
 
   // Function to fetch admin role from admin collection
-  const fetchAdminRole = async (uid: string, email: string): Promise<string> => {
-  try {
-    console.log(`🔍 Fetching admin role for uid: ${uid}, email: ${email}`);
+  const fetchAdminRole = async (
+    uid: string,
+    email: string
+  ): Promise<string> => {
+    try {
+      console.log(`🔍 Fetching admin role for uid: ${uid}, email: ${email}`);
 
-    // 1️⃣ Check by UID first
-    if (uid) {
-      const adminDocRef = doc(db, "admin", uid);
-      const adminDoc = await getDoc(adminDocRef);
-      if (adminDoc.exists()) {
-        const role = adminDoc.data()?.adminRole || adminDoc.data()?.role;
-        console.log(`✅ Found admin by uid ${uid}: role = ${role}`);
-        if (role) return role;
-      }
-    }
-
-    // 2️⃣ Fallback: search by email
-    if (email) {
-      const adminCollection = collection(db, "admin");
-      const adminSnapshot = await getDocs(adminCollection);
-
-      for (const adminDoc of adminSnapshot.docs) {
-        const adminData = adminDoc.data();
-        if (adminData.email === email) {
-          const role = adminData.adminRole || adminData.role;
-          console.log(`✅ Found admin by email ${email}: role = ${role}`);
+      // 1️⃣ Check by UID first
+      if (uid) {
+        const adminDocRef = doc(db, "admin", uid);
+        const adminDoc = await getDoc(adminDocRef);
+        if (adminDoc.exists()) {
+          const role = adminDoc.data()?.adminRole || adminDoc.data()?.role;
+          console.log(`✅ Found admin by uid ${uid}: role = ${role}`);
           if (role) return role;
         }
       }
+
+      // 2️⃣ Fallback: search by email
+      if (email) {
+        const adminCollection = collection(db, "admin");
+        const adminSnapshot = await getDocs(adminCollection);
+
+        for (const adminDoc of adminSnapshot.docs) {
+          const adminData = adminDoc.data();
+          if (adminData.email === email) {
+            const role = adminData.adminRole || adminData.role;
+            console.log(`✅ Found admin by email ${email}: role = ${role}`);
+            if (role) return role;
+          }
+        }
+      }
+
+      console.log(
+        `ℹ️ ${email || uid} not found in admin collection, returning 'user'`
+      );
+      return "user";
+    } catch (error) {
+      console.log("❌ Error fetching admin role:", error);
+      return "user";
     }
-
-    console.log(`ℹ️ ${email || uid} not found in admin collection, returning 'user'`);
-    return "user";
-  } catch (error) {
-    console.log("❌ Error fetching admin role:", error);
-    return "user";
-  }
-};
-
+  };
 
   // Fetch user logs from Firebase
   useEffect(() => {
@@ -575,6 +579,7 @@ const UserLogsPage = () => {
         </div>
 
         {/* Table */}
+        {/* change the background color of the raws (blue and green) alternetily */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -600,14 +605,17 @@ const UserLogsPage = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-blue-100">
                 {paginatedSessions.map((row, idx) => {
                   const sequentialNumber = startIndex + idx + 1;
+                  const isEvenRow = idx % 2 === 0;
 
                   return (
                     <tr
                       key={row.rowId}
-                      className="hover:bg-slate-50 transition-colors"
+                      className={`hover:opacity-90 transition-colors ${
+                        isEvenRow ? "bg-blue-400/20" : "bg-gray-200/20"
+                      }`}
                     >
                       <td className="px-6 py-4 text-center">
                         <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">
