@@ -46,11 +46,7 @@ interface UserLog {
   lastLogin: string;
   lastLogout: string | null;
 }
-interface SignInPageProps {
-  className?: string;
-}
-
-export default function SignInPage({ className }: SignInPageProps) {
+export default function SignInPage() {
   const [loading, setLoading] = useState({
     page: true,
     auth: false,
@@ -416,7 +412,7 @@ export default function SignInPage({ className }: SignInPageProps) {
   }
 
   return (
-    <div className={cn(" flex flex-col mt-35", className)}>
+    <div className={cn("flex flex-col mt-35")}>
       {/* Main Content */}
       <div className=" flex items-center justify-center">
         {showProhibitedModal && (
