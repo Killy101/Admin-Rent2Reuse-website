@@ -1,22 +1,42 @@
-    import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
-// Your Firebase config
+// Firebase config from environment variables
 const firebaseConfig = {
-  // Add your Firebase configuration here
-  // This should match your existing Firebase config
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase Admin if not already initialized
-if (!getApps().length) {
-  initializeApp(firebaseConfig);
+// Initialize Firebase if not already initialized
+let db: any;
+
+try {
+  if (!getApps().length) {
+    initializeApp(firebaseConfig);
+  }
+  db = getFirestore();
+} catch (error) {
+  console.error('Firebase initialization error:', error);
 }
 
-const db = getFirestore();
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Firebase is initialized
+    if (!db) {
+      console.error('Firestore not initialized');
+      return NextResponse.json(
+        { error: 'Database not available' },
+        { status: 503 }
+      );
+    }
+
     const data = await request.json();
     const { uid, timestamp, action } = data;
 
@@ -77,7 +97,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.log('Error in logout beacon:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error in logout beacon:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
+}
+
+// Required for Vercel static generation
+export async function GET() {
+  return NextResponse.json({ 
+    status: 'Logout beacon endpoint',
+    method: 'POST required' 
+  });
 }
