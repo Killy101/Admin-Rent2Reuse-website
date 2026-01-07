@@ -211,7 +211,7 @@ export default function SignInPage() {
         if (mounted) {
           setLoading((prev) => ({ ...prev, page: false, auth: false }));
           // Use replace to prevent back navigation to login
-          router.replace("/admin/dashboard");
+          router.replace("/admin");
         }
       } catch (error) {
         console.log("Error in auth state change:", error);
