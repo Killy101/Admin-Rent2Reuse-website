@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:https": "cross-env NODE_ENV=development node server.js",
-    "prebuild": "node vercel-build.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
