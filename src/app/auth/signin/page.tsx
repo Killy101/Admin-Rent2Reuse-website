@@ -211,7 +211,7 @@ export default function SignInPage() {
         if (mounted) {
           setLoading((prev) => ({ ...prev, page: false, auth: false }));
           // Use replace to prevent back navigation to login
-          router.replace("/admin");
+          router.replace("/admin/dashboard");
         }
       } catch (error) {
         console.log("Error in auth state change:", error);
@@ -234,16 +234,18 @@ export default function SignInPage() {
     uid: string,
     email: string | null
   ): Promise<AdminData | null> => {
-    if (!uid || !email) return null;
+    if (!uid) return null;
 
     try {
       let adminQuery = query(collection(db, "admin"), where("uid", "==", uid));
       let adminSnapshot = await getDocs(adminQuery);
 
-      if (adminSnapshot.empty) {
+      // If not found by uid, try email when available (normalize to lowercase)
+      if (adminSnapshot.empty && email) {
+        const normalizedEmail = email.trim().toLowerCase();
         adminQuery = query(
           collection(db, "admin"),
-          where("email", "==", email)
+          where("email", "==", normalizedEmail)
         );
         adminSnapshot = await getDocs(adminQuery);
       }
