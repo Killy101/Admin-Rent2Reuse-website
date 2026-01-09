@@ -206,6 +206,8 @@ export default function SignInPage() {
         localStorage.setItem("adminUid", user.uid);
         localStorage.setItem("isAuthenticated", "true");
 
+        document.cookie = `adminData=true; path=/; max-age=86400; secure; samesite=lax`;
+
         console.log("Admin validation successful, redirecting to dashboard");
 
         if (mounted) {

@@ -50,11 +50,11 @@ import { AdminAuthCheck } from "@/components/auth/AdminAuthCheck";
 const sidebarStyles = {
   nav: "flex-1 overflow-y-auto px-4 py-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent",
   navItem:
-    "flex items-center p-4 transition-all duration-300 rounded-xl mb-2 font-medium text-sm relative overflow-hidden group",
+    "flex items-center p-4 transition-all duration-300 rounded-xl mb-2 font-medium xtext-sm relative overflow-hidden group",
   activeNavItem:
     "bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-1 before:absolute before:inset-0 before:bg-white/10 before:opacity-0 hover:before:opacity-100 before:transition-opacity",
   inactiveNavItem:
-    "text-gray-700 hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-100 hover:shadow-md transform hover:-translate-y-0.5",
+    "text-gray-700 hover:bg-gradient-to-r hover:from-orange-50 hover:to-orange-100 hover:shadow-md transform hover:-translate-y-0.5",
   icon: "w-5 h-5 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3",
   dropdown:
     "w-full rounded-xl transition-all duration-300 relative overflow-hidden",
@@ -81,14 +81,7 @@ const navigationItems: NavItem[] = [
     href: "/admin",
     icon: MdOutlineDashboard,
     description: "Overview of system metrics and insights",
-    allowedRoles: [
-      "superAdmin",
-      "admin",
-      "support",
-      "manageUsers",
-      "financialViewer",
-      "contentManager",
-    ],
+    allowedRoles: ["superAdmin", "admin", "support", "manageUsers", "financialViewer", "contentManager"],
   },
   {
     name: "Inventory",
@@ -97,13 +90,6 @@ const navigationItems: NavItem[] = [
     description: "Manage and monitor rentable items",
     allowedRoles: ["superAdmin", "admin", "manageUsers", "contentManager"],
   },
-  // {
-  //   name: "customized Inventory",
-  //   href: "/admin/customize",
-  //   icon: TiThListOutline,
-  //   description: "Manage and monitor rentable items",
-  //   allowedRoles: ["superAdmin", "admin", "manageUsers", "contentManager"],
-  // },
   {
     name: "Users",
     href: "/admin/manageUsers",
@@ -147,7 +133,7 @@ const navigationItems: NavItem[] = [
     description: "View and manage subscription plans",
     allowedRoles: ["superAdmin", "admin", "financialViewer"],
   },
-
+ 
   {
     name: "Support",
     href: "/admin/support",
@@ -176,14 +162,16 @@ const navigationItems: NavItem[] = [
     description: "Monitor system and user activity logs",
     allowedRoles: ["superAdmin", "admin", "support", "manageUsers"],
   },
-  {
-    name: "Chat Logs",
-    href: "/admin/chatLogs",
-    icon: MdCircleNotifications,
-    description: "Review chat interactions and logs",
-    allowedRoles: ["superAdmin", "admin", "manageUsers"],
-  },
+  // {
+    
+  //   name: "Chat Logs",
+  //   href: "/admin/chatLogs",  
+  //   icon: MdCircleNotifications,
+  //   description: "Review chat interactions and logs",
+  //   allowedRoles: ["superAdmin", "admin", "manageUsers"],
+  // }
 ];
+
 
 // Define allowed admin roles
 export type AdminRole =
@@ -254,37 +242,36 @@ const getFilteredNavigationItems = (adminRole: AdminRole | null): NavItem[] => {
   if (allowedPaths.includes("*")) return navigationItems;
 
   // Filter by allowedRoles and path access
-  return navigationItems
-    .filter((item) => {
-      const roleAllowed = item.allowedRoles?.includes(adminRole) ?? true;
-
-      // For items with children (dropdowns), check if role has access to parent
-      if (item.children && item.children.length > 0) {
-        // Show dropdown if role is allowed and has access to any child
-        return (
-          roleAllowed &&
-          item.children.some((child) => hasAccess(adminRole, child.href || ""))
-        );
-      }
-
-      // For regular items, check href access
-      if (!item.href) return false;
-      return roleAllowed && hasAccess(adminRole, item.href);
-    })
-    .map((item) => {
-      // Filter children based on role access
-      if (item.children && item.children.length > 0) {
-        return {
-          ...item,
-          children: item.children.filter((child) => {
-            const roleAllowed = child.allowedRoles?.includes(adminRole) ?? true;
-            return roleAllowed && hasAccess(adminRole, child.href || "");
-          }),
-        };
-      }
-      return item;
-    });
+  return navigationItems.filter((item) => {
+    const roleAllowed = item.allowedRoles?.includes(adminRole) ?? true;
+    
+    // For items with children (dropdowns), check if role has access to parent
+    if (item.children && item.children.length > 0) {
+      // Show dropdown if role is allowed and has access to any child
+      return roleAllowed && item.children.some((child) =>
+        hasAccess(adminRole, child.href || "")
+      );
+    }
+    
+    // For regular items, check href access
+    if (!item.href) return false;
+    return roleAllowed && hasAccess(adminRole, item.href);
+  }).map((item) => {
+    // Filter children based on role access
+    if (item.children && item.children.length > 0) {
+      return {
+        ...item,
+        children: item.children.filter((child) => {
+          const roleAllowed = child.allowedRoles?.includes(adminRole) ?? true;
+          return roleAllowed && hasAccess(adminRole, child.href || "");
+        }),
+      };
+    }
+    return item;
+  });
 };
+
+
 
 interface SidebarProps {
   currentPath?: string;
@@ -326,9 +313,7 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [notificationCounts, setNotificationCounts] = useState<
-    Record<string, number>
-  >({});
+  const [notificationCounts, setNotificationCounts] = useState<Record<string, number>>({});
   const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
 
   const pathname = usePathname();
@@ -370,21 +355,21 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
             setImageError(false);
 
             // Update localStorage
-            if (adminData.adminRole) {
-              localStorage.setItem("adminRole", adminData.adminRole);
-            }
+            // if (adminData.adminRole) {
+            //   localStorage.setItem("adminRole", adminData.adminRole);
+            // }
 
-            console.log("â Updated sidebar state with new data:", {
-              username: adminData.username,
-              adminRole: adminData.adminRole,
-              profileImage: adminData.profileImageUrl,
-            });
+            // console.log("â Updated sidebar state with new data:", {
+            //   username: adminData.username,
+            //   adminRole: adminData.adminRole,
+            //   profileImage: adminData.profileImageUrl,
+            // });
           } else {
             console.warn("â ï¸ No admin document found for email:", user.email);
             setUsername(null);
             setAdminRole(null);
             setProfileImage(null);
-            localStorage.removeItem("adminRole");
+            // localStorage.removeItem("adminRole");
           }
           setUserDataLoading(false);
         },
@@ -535,8 +520,12 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
       localStorage.removeItem("adminUid");
       localStorage.removeItem("isAuthenticated");
 
+      // document.cookie = `admin-auth=true; path=/; max-age=86400; secure; samesite=lax`;
+
       // Sign out from Firebase Auth
       await signOut(auth);
+
+      //  document.cookie = "adminData=; path=/; max-age=0;";
 
       console.log("✅ Sidebar logout completed successfully");
     } catch (error) {
@@ -882,8 +871,9 @@ const ClientSidebar = ({ currentPath }: SidebarProps) => {
 
               if (hasChildren) {
                 // Render dropdown item
-                const childIsActive =
-                  item.children?.some((child) => isActive(child.href)) || false;
+                const childIsActive = item.children?.some((child) =>
+                  isActive(child.href)
+                ) || false;
 
                 return (
                   <div key={item.name}>

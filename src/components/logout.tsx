@@ -113,6 +113,8 @@ const Logout = () => {
       localStorage.removeItem("adminUid");
       localStorage.removeItem("isAuthenticated");
 
+      document.cookie = "adminData=; path=/; max-age=0;";
+
       // Sign out from Firebase Auth
       await signOut(auth);
 
